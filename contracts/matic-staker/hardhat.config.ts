@@ -1,22 +1,11 @@
 import { HardhatUserConfig } from "hardhat/config";
 import "@nomicfoundation/hardhat-toolbox";
 import "@openzeppelin/hardhat-upgrades";
-import { utils } from "ethers";
 import "hardhat-gas-reporter";
-require("dotenv").config();
+require("dotenv").config({path: '../../.env'});
 require("hardhat-contract-sizer");
 require('hardhat-abi-exporter');
 
-export const pks = [
-  process.env.PK0,
-  process.env.PK1,
-  process.env.PK2,
-  process.env.PK3,
-  process.env.PK4,
-  process.env.PK5,
-  process.env.PK6,
-  process.env.PK7
-];
 
 export default {
   mocha: {
@@ -33,43 +22,41 @@ export default {
   },
   networks: {
     goerli: {
-      url: process.env.GOERLI_URI,
+      url: process.env.GOERLI_RPC,
       chainId: 5,
       // gas: 180_000_000, // 200_000_000
       // gasLimit: 180_000_000, // 200_000_000
       // gasPrice: 8_000_000_000, // 400_000_000_000
-      accounts: pks
+      accounts: [process.env.DEPLOYER_PK]
     },
     mumbai: {
-      url: process.env.MUMBAI_URI,
+      url: process.env.MUMBAI_RPC,
       chainId: 80001,
       // gas: 180_000_000,
       // gasPrice: 8_000_000_000,
-      accounts: pks
+      accounts: [process.env.DEPLOYER_PK]
     },
     mainnet: {
-      url: process.env.MAINNET_URI,
+      url: process.env.MAINNET_RPC,
       chainId: 1,
       gas: 5_000_000,
       gasPrice: 40_000_000_000,
-      accounts: pks
+      accounts: [process.env.DEPLOYER_PK]
     },
     hardhat: {
       forking: {
-        //Due to RPC error using Mainnet URI
-        url: process.env.MAINNET_URI,
-        // url: process.env.ETHEREUM_ALCHEMY,
+        //Due to RPC error using Mainnet RPC
+        url: process.env.MAINNET_RPC,
         // block before checkpoint submitted
         blockNumber: 17485579,
       },
-      accounts: pks.map((pk) => ({
-        privateKey: pk,
-        balance: utils.parseEther("10000").toString()
-      }))
+      accounts: {
+        privateKey: [process.env.DEPLOYER_PK],
+      }
     }
   },
   etherscan: {
-    apiKey: process.env.ETHERSCAN_API_KEY
+    apiKey: process.env.ETHERSCAN_API
   },
   gasReporter: {
     // enabled: true,

@@ -14,7 +14,8 @@
     "prettify-sol": "lerna run prettify-sol --stream --concurrency 1 --no-bail",
     "coverage-sol": "lerna run coverage-sol --stream --concurrency 1 --no-bail",
     "check-gas": "lerna run check-gas --stream --concurrency 1 --no-bail",
-    "export-abis": "lerna run export-abis --stream --concurrency 1 --no-bail"
+    "export-abis": "lerna run export-abis --stream --concurrency 1 --no-bail",
+    "slither" : "lerna exec slither ."
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-network-helpers": "^1.0.8",
@@ -35,10 +36,12 @@
     "solhint": "^3.4.1"
   },
   "dependencies": {
+    "@defi-wonderland/smock": "^2.3.5",
     "@ethersproject/constants": "^5.7.0",
     "@openzeppelin/contracts": "^4.9.0",
     "@openzeppelin/contracts-upgradeable": "^4.9.0",
     "dotenv": "^16.0.3",
-    "envfile": "^6.18.0"
+    "envfile": "^6.18.0",
+    "web3": "^4.1.0"
   }
 }

@@ -2,8 +2,13 @@ import { ethers, network, upgrades } from "hardhat";
 
 async function main() {
     const stakerFactory = await ethers.getContractFactory("TruStakeMATICv2");
-    const staker = await upgrades.upgradeProxy(process.env.STAKER_ADDRESS, stakerFactory);
-    // see note at writeEnv in deploy-staker.ts
+    let staker;
+    if(network.name === "mainnet"){
+      staker = await upgrades.upgradeProxy(process.env.STAKER_MAINNET, stakerFactory);
+    }
+    if(network.name === "goerli"){
+      staker = await upgrades.upgradeProxy(process.env.STAKER_GOERLI, stakerFactory);
+    }
 
     console.log("Staker deployment upgraded");
     console.log("Delete `cache` and `artifacts` before attempting to verify");

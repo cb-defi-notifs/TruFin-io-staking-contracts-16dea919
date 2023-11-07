@@ -1,7 +1,5 @@
 import { ethers, upgrades, network } from "hardhat";
-const fs = require("fs");
-const envfile = require("envfile");
-
+import { writeEnv } from "../../../helpers/deploy-utils"
 import {
     STAKING_TOKEN_ADDRESS,
     STAKE_MANAGER_CONTRACT_ADDRESS,
@@ -12,16 +10,6 @@ import {
     DIST_PHI,
     CAP,
 } from "../constants/constants";
-
-// Helpers
-
-const writeEnv = (k, v) => {
-    let parsedFile = envfile.parse(fs.readFileSync(".env").toString());
-    parsedFile[k] = v;
-    let configString = envfile.stringify(parsedFile);
-    fs.writeFileSync(".env", configString);
-    console.log(`Saved value ${v} to key ${k} in .env file`);
-}
 
 // Main
 
@@ -64,8 +52,14 @@ async function main() {
     console.log(`Verify with: npx hardhat verify ${staker.address} --network ${network.name}`);
     // console.log(`Verify with: npx hardhat verify ${staker.address} ${args.join(" ")} --network ${network.name}`);
 
-    // store staker address in env
-    writeEnv("STAKER_ADDRESS", staker.address);
+    if(network.name === "goerli"){
+      // store staker address in env
+      writeEnv("STAKER_GOERLI", staker.address);
+    }
+    if(network.name === "mainnet"){
+      // store staker address in env
+      writeEnv("STAKER_MAINNET", staker.address);
+    }
     // for now just storing one, later add a deployments.json file which stores an address by chain id
 }
 
