@@ -39,7 +39,7 @@ describe("REALLOCATE", () => {
     await submitCheckpoint(0);
 
     // distribute
-    await staker.connect(one).distributeAll(one.address, false);
+    await staker.connect(one).distributeAll(one.address, false, false);
 
     // check balance of three should be the same as balance of four
     const threeBalance = await staker.balanceOf(three.address);
@@ -91,7 +91,7 @@ describe("REALLOCATE", () => {
     await submitCheckpoint(0);
 
     // distribute
-    await staker.connect(one).distributeAll(one.address, false);
+    await staker.connect(one).distributeAll(one.address, false, false);
 
     // check balance of three should be the same as balance of four
     const threeBalance = await staker.balanceOf(three.address);
@@ -144,7 +144,7 @@ describe("REALLOCATE", () => {
     await submitCheckpoint(0);
 
     // distribute
-    await staker.connect(one).distributeAll(one.address, false);
+    await staker.connect(one).distributeAll(one.address, false, false);
 
     // check balance of three should be the same as balance of four
     const twoBalance = await staker.balanceOf(two.address);
@@ -177,10 +177,10 @@ describe("REALLOCATE", () => {
 
     // allocate 2k to two
     await staker.connect(one).allocate(parseEther(2000), two.address, false);
-    
+
     // accrue rewards
     await submitCheckpoint(0);
-    
+
     // reallocate to one
     await staker.connect(one).reallocate(two.address, one.address);
   });
@@ -193,10 +193,10 @@ describe("REALLOCATE", () => {
 
     // allocate 2k to two
     await staker.connect(one).allocate(parseEther(2000), two.address, false);
-    
+
     // accrue rewards
     await submitCheckpoint(0);
-    
+
     // check user not whitelisted
     expect(
       await whitelist.isUserWhitelisted(randomUser)
@@ -206,13 +206,24 @@ describe("REALLOCATE", () => {
     await staker.connect(one).reallocate(two.address, randomUser);
   });
 
-  it("fail: reallocate from non-existent allocation", async () => {
+  it("fail: reallocating from a non-existent allocation", async () => {
     await expect(
       staker.connect(one).reallocate(two.address, three.address)
     ).to.be.revertedWithCustomError(staker, "AllocationNonExistent");
   });
 
-  it("reallocating strict allocation fails", async () => {
+  it("fail: reallocating to the original recipient", async () => {
+    // one deposits 10k
+    await staker.connect(one).deposit(parseEther(1000), one.address);
+
+    // one allocates 2k to two
+    await staker.connect(one).allocate(parseEther(1000), two.address, false);
+    await expect(
+      staker.connect(one).reallocate(two.address, two.address)
+    ).to.be.revertedWithCustomError(staker, "AllocationToInitialRecipient");
+  });
+
+  it("fail: reallocating a strict allocation", async () => {
     const strictness = true;
     await staker.connect(deployer).setAllowStrict(strictness);
     await staker.connect(one).deposit(parseEther(1e6), one.address);

@@ -27,15 +27,16 @@ describe("ALLOCATION", () => {
     // All exclusively loose tests go in here
 
     const strictness = false;
+    const distributionInMATIC = false;
 
     // Passing test cases
 
     it("pass: making two allocations adding up to MATIC amount larger than user deposited MATIC", async () => {
-      // spread over two (8000 + 3000 = 11000, > 10000) 
+      // spread over two (8000 + 3000 = 11000, > 10000)
       // should work - this is actually expected behaviour
       await staker.connect(one).allocate(parseEther(8000), two.address, strictness);
       await staker.connect(one).allocate(parseEther(3000), two.address, strictness);
-  
+
       // check allocation values
       const oneTwoAllocation = await staker.allocations(one.address, two.address, strictness);
       expect(oneTwoAllocation.maticAmount).to.equal(parseEther(11000));
@@ -45,7 +46,7 @@ describe("ALLOCATION", () => {
       // Allocate 10k
       await staker.connect(one).allocate(parseEther(5000), two.address, strictness);
       await staker.connect(one).allocate(parseEther(5000), two.address, strictness);
-  
+
       // Check sum is correct
       const oneTwoAllocationLoose = await staker.allocations(one.address, two.address, strictness);
       expect(oneTwoAllocationLoose.maticAmount).to.equal(parseEther(10000));
@@ -54,30 +55,30 @@ describe("ALLOCATION", () => {
     it("pass: first allocation updates state accordingly", async () => {
       // Allocate 1k
       await staker.connect(one).allocate(parseEther(1000), two.address, strictness);
-      
+
       const sharePriceFraction = await staker.sharePrice();
-      
+
       // Check values are correctly saved into allocation structs, no math required as first allocation
-      
+
       const oneTwoAllocation = await staker.allocations(one.address, two.address, strictness);
-      
+
       expect(oneTwoAllocation.maticAmount).to.equal(parseEther(1000));
       expect(
         oneTwoAllocation.sharePriceNum.div(oneTwoAllocation.sharePriceDenom)
       ).to.equal(parseEther(1));
       expect(oneTwoAllocation.sharePriceNum).to.equal(sharePriceFraction[0]);
       expect(oneTwoAllocation.sharePriceDenom).to.equal(sharePriceFraction[1]);
-      
+
       // Check values are correctly saved into total allocated struct, no math required as first allocation
-      
+
       const oneTotalAllocated = await staker.totalAllocated(one.address, strictness);
-      
+
       expect(oneTotalAllocated.maticAmount).to.equal(parseEther(1000));
       expect(oneTotalAllocated.sharePriceNum).to.equal(sharePriceFraction[0]);
       expect(oneTotalAllocated.sharePriceDenom).to.equal(sharePriceFraction[1]);
-      
+
       // Check if address one and two have correct first element in dist/recipient array
-      
+
       expect(await staker.distributors(two.address, strictness, 0)).to.equal(one.address);
       expect(await staker.recipients(one.address, strictness, 0)).to.equal(two.address);
 
@@ -96,17 +97,17 @@ describe("ALLOCATION", () => {
 
       let firstAllocationAmount = parseEther(1000);
       let secondAllocationAmount = parseEther(2000);
-      
+
       let sharePriceFractionOld = await staker.sharePrice();
-      
+
       // Double check share price starts as 1e18
       expect(sharePriceFractionOld[0].div(sharePriceFractionOld[1])).to.equal(parseEther(1));
-      
+
       // Allocate 1k one-two
       await staker.connect(one).allocate(firstAllocationAmount, two.address, strictness);
-      
+
       // First allocation so allocation and total allocated should have same values for everything
-      
+
       const oneTwoAllocation = await staker.allocations(one.address, two.address, strictness);
       expect(oneTwoAllocation.maticAmount).to.equal(firstAllocationAmount);
       expect(oneTwoAllocation.sharePriceNum).to.equal(sharePriceFractionOld[0]);
@@ -127,12 +128,12 @@ describe("ALLOCATION", () => {
         // Allocate 2k more to user two
         await staker.connect(one).allocate(secondAllocationAmount, two.address, strictness);
         // The one-two allocation struct should have the same amt but share price should have changed
-      
+
         let oneTwoAllocationNew = await staker.allocations(one.address, two.address, strictness);
         expect(oneTwoAllocationNew.maticAmount).to.equal(
           firstAllocationAmount.add(secondAllocationAmount)
         );
-        
+
         let oneTotalAllocatedNew = await staker.totalAllocated(one.address, strictness);
         expect(oneTotalAllocatedNew.maticAmount).to.equal(
           firstAllocationAmount.add(secondAllocationAmount)
@@ -142,13 +143,13 @@ describe("ALLOCATION", () => {
         .mul(parseEther(1))
         .mul(sharePriceFractionOld[1])
         .div(sharePriceFractionOld[0]);
-        
+
         // Div allocated amount by spx to get share count
         let currentAllocationTheoreticalSharecount = secondAllocationAmount
         .mul(parseEther(1))
         .mul(sharePriceFractionNew[1])
         .div(sharePriceFractionNew[0]);
-        
+
         let averageTheoreticalSharePrice = firstAllocationAmount.add(secondAllocationAmount)
         .mul(parseEther(1))
         .div(priorAllocationTheoreticalSharecount.add(currentAllocationTheoreticalSharecount));
@@ -164,33 +165,33 @@ describe("ALLOCATION", () => {
         sharePriceFractionOld = [oneTwoAllocationNew.sharePriceNum,oneTwoAllocationNew.sharePriceDenom]
         firstAllocationAmount = firstAllocationAmount.add(secondAllocationAmount);
       }
-     
+
       // Also check distributor and recipient arrays
       expect(await staker.getDistributors(two.address, strictness)).to.eql([one.address]);
       expect(await staker.getRecipients(one.address, strictness)).to.eql([two.address]);
     });
-    
+
     it("pass: multiple allocations to different people work correctly", async () => {
       const sharePriceFractionOld = await staker.sharePrice();
-  
+
       const oneTwoAllocatedAmount = parseEther(1000);
       const oneThreeAllocatedAmount = parseEther(2000);
       const oneFourAllocatedAmount = parseEther(2000);
-      
+
       const amountAllocatedWithOldSharePrice = oneTwoAllocatedAmount.add(oneThreeAllocatedAmount);
       const amountAllocatedWithNewSharePrice = oneFourAllocatedAmount;
-  
+
       // One allocates 1k to two, 2k to three
       await staker.connect(one).allocate(oneTwoAllocatedAmount, two.address, strictness);
       await staker.connect(one).allocate(oneThreeAllocatedAmount, three.address, strictness);
-      
+
       // Check one total allocated values are stored correctly
       const oneTotalAllocated = await staker.totalAllocated(one.address, strictness);
       expect(oneTotalAllocated.maticAmount).to.equal(amountAllocatedWithOldSharePrice);
       expect(
         oneTotalAllocated.sharePriceNum.div(oneTotalAllocated.sharePriceDenom)
       ).to.equal(sharePriceFractionOld[0].div(sharePriceFractionOld[1]));
-      
+
       // Accrue rewards
       await submitCheckpoint(0);
 
@@ -202,11 +203,11 @@ describe("ALLOCATION", () => {
         .mul(constants.PHI)
         .div(constants.PHI_PRECISION);
       expect(dust).to.equal(calculatedDust);
-  
+
       // Four deposits 1k
       await staker.connect(four).deposit(parseEther(1000), four.address);
       const sharePriceFractionNew = await staker.sharePrice();
-      
+
       // With new deposit, rewards were swept up and dumped into contract,
       //   so dust should be 0 and shares minted to treasury
       //uint256 shareIncreaseTsy = (totalRewards() * phi * 1e18 * globalPriceDenom) /
@@ -215,64 +216,64 @@ describe("ALLOCATION", () => {
       expect(
         await staker.balanceOf(treasury.address)
       ).to.equal(calculateTrsyWithdrawFees(totalRewards, [sharePriceFractionNew[0], sharePriceFractionNew[1]]));
-  
+
       // Four allocates .5k to three, one allocates 2k to four
       await staker.connect(four).allocate(parseEther(500), three.address, strictness);
       await staker.connect(one).allocate(oneFourAllocatedAmount, four.address, strictness);
-  
+
       // Check allocation values for all current allocations are correct
-  
+
       const oneTwoAllocation = await staker.allocations(one.address, two.address, strictness);
       expect(oneTwoAllocation.maticAmount).to.equal(oneTwoAllocatedAmount);
       expect(oneTwoAllocation.sharePriceNum).to.equal(sharePriceFractionOld[0]);
       expect(oneTwoAllocation.sharePriceDenom).to.equal(sharePriceFractionOld[1]);
-      
+
       const oneThreeAllocation = await staker.allocations(one.address, three.address, strictness);
       expect(oneThreeAllocation.maticAmount).to.equal(oneThreeAllocatedAmount);
       expect(oneThreeAllocation.sharePriceNum).to.equal(sharePriceFractionOld[0]);
       expect(oneThreeAllocation.sharePriceDenom).to.equal(sharePriceFractionOld[1]);
-      
+
       const oneFourAllocation = await staker.allocations(one.address, four.address, strictness);
       expect(oneFourAllocation.maticAmount).to.equal(oneFourAllocatedAmount);
       expect(oneFourAllocation.sharePriceNum).to.equal(sharePriceFractionNew[0]);
       expect(oneFourAllocation.sharePriceDenom).to.equal(sharePriceFractionNew[1]);
-  
+
       // Extra control test: unused for later checks
       const fourThreeAllocation = await staker.allocations(four.address, three.address, strictness);
       expect(fourThreeAllocation.maticAmount).to.equal(parseEther(500));
       expect(fourThreeAllocation.sharePriceNum).to.equal(sharePriceFractionNew[0]);
       expect(fourThreeAllocation.sharePriceDenom).to.equal(sharePriceFractionNew[1]);
-  
+
       // Find theoretical average share price and compare to actual share price
       //   use: old amount allocated * old price + new amount * new price / total amt
-      
+
       // Calculate theoretical values
-  
+
       const firstAllocationTheoreticalShareCount = amountAllocatedWithOldSharePrice // parseEther(3000)
         .mul(parseEther(1))
         .mul(sharePriceFractionOld[1])
         .div(sharePriceFractionOld[0]);
-      
+
       const secondAllocationTheoreticalShareCount = amountAllocatedWithNewSharePrice // parseEther(2000)
         .mul(parseEther(1))
         .mul(sharePriceFractionNew[1])
         .div(sharePriceFractionNew[0]);
-  
+
       // see above tests for explanation of these calculations
       const averageTheoreticalSharePrice = amountAllocatedWithOldSharePrice
         .add(amountAllocatedWithNewSharePrice)
         .mul(parseEther(1))
         .div(firstAllocationTheoreticalShareCount.add(secondAllocationTheoreticalShareCount));
-  
+
       // Get actual values
-  
+
       const oneTotalAllocatedNew = await staker.totalAllocated(one.address, strictness);
-  
+
       const oneTotalAllocationSharePrice = oneTotalAllocatedNew.sharePriceNum
         .div(oneTotalAllocatedNew.sharePriceDenom);
-  
+
       // Compare theoretical and actual values
-  
+
       expect(oneTotalAllocationSharePrice).to.equal(averageTheoreticalSharePrice);
     });
 
@@ -309,14 +310,14 @@ describe("ALLOCATION", () => {
 
     it("pass: should be able to transfer loosely allocated balance", async () => {
       await staker.connect(one).allocate(parseEther(1000), two.address, strictness);
-    
+
       const transferAmount = parseEther(10000);
-    
+
       const oneBalanceOld = await staker.balanceOf(one.address);
       const threeBalanceOld = await staker.balanceOf(three.address);
-    
+
       await staker.connect(one).transfer(three.address, transferAmount);
-      
+
       const oneBalanceNew = await staker.balanceOf(one.address);
       const threeBalanceNew = await staker.balanceOf(three.address);
 
@@ -338,12 +339,12 @@ describe("ALLOCATION", () => {
       await staker.connect(one).allocate(parseEther(10000), three.address, strictness);
       await staker.connect(one).allocate(parseEther(10000), four.address, strictness);
 
-      let distributorInitialBalance = await staker.getUserInfo(one.address); 
+      let distributorInitialBalance = await staker.getUserInfo(one.address);
 
       for(let i = 0; i<5; i++){
       // REWARDS ACCRUE
       await submitCheckpoint(i);
-      
+
       // _______________Calculate Recipient Rewards_____________________
       let [globalSharePriceNumerator, globalSharePriceDenominator] = await staker.sharePrice();
 
@@ -368,11 +369,11 @@ describe("ALLOCATION", () => {
       // Rewards in TruMATIC & MATIC
       let twoOneTruMATICRewards = rewardShares.sub(twoOneAllocTruMATICFee);
       let twoOneMATICRewards = await staker.convertToAssets(twoOneTruMATICRewards);
-     
+
       // _________________________________________________________
 
-      // DISTRIBUTE ALL 
-      await staker.connect(one).distributeAll(one.address, strictness);
+      // DISTRIBUTE ALL
+      await staker.connect(one).distributeAll(one.address, strictness, distributionInMATIC);
 
       // GET BALANCES
       // distributor
@@ -381,7 +382,7 @@ describe("ALLOCATION", () => {
       let twoInfo = await staker.getUserInfo(two.address);
       let threeInfo = await staker.getUserInfo(three.address);
       let fourInfo = await staker.getUserInfo(four.address);
-    
+
       // All recipients receive equal amount of rewards (ignore rounding)
       expect(twoInfo[1].div(1e1)).to.equal(threeInfo[1].div(1e1));
       expect(threeInfo[1].div(1e1)).to.equal(fourInfo[1].div(1e1));
@@ -392,8 +393,8 @@ describe("ALLOCATION", () => {
       expect(newRecipientMaticMinusEpsilon).to.be.greaterThanOrEqual(twoOneMATICRewards);
 
       // distributor deposit is partially eaten up by the fact he needs to rewards to all other parties 10,000 MATIC => 9,999 MATIC
-      let distributorMATICBalanceAfterDeposit = 
-      calculateAmountFromShares (distributorPostDistBalance[0], 
+      let distributorMATICBalanceAfterDeposit =
+      calculateAmountFromShares (distributorPostDistBalance[0],
         [distributorPostDistBalance[2], distributorPostDistBalance[3]]
         );
 
@@ -407,14 +408,14 @@ describe("ALLOCATION", () => {
 
       const oneTwoAllocation =await staker.allocations(one.address, two.address, strictness);
       const totalAllocated = await staker.totalAllocated(one.address, strictness);
-      const allocatedPrice = (totalAllocated.sharePriceNum).div(totalAllocated.sharePriceDenom); 
+      const allocatedPrice = (totalAllocated.sharePriceNum).div(totalAllocated.sharePriceDenom);
 
       for (let i = 0; i<5; i++){
       // REWARDS ACCRUE
       await submitCheckpoint(i);
 
       // DISTRIBUTE REWARDS
-      const distributeTx = await staker.connect(one).distributeRewards(two.address, one.address, strictness);
+      const distributeTx = await staker.connect(one).distributeRewards(two.address, one.address, strictness, distributionInMATIC);
       expect(distributeTx).to.emit(staker, "DistributedRewards");
 
       const oneTwoAllocationNow = await staker.allocations(one.address, two.address, strictness);
@@ -425,7 +426,7 @@ describe("ALLOCATION", () => {
       expect(totalAllocatedNow.maticAmount).to.equal(totalAllocated.maticAmount);
 
       // Current allocation price
-      const allocatedPriceNow = (totalAllocatedNow.sharePriceNum).div(totalAllocatedNow.sharePriceDenom);     
+      const allocatedPriceNow = (totalAllocatedNow.sharePriceNum).div(totalAllocatedNow.sharePriceDenom);
 
       // current share price
       const currentPrice = await staker.sharePrice();
@@ -447,19 +448,19 @@ describe("ALLOCATION", () => {
 
       const oneTwoAllocationOne =await staker.allocations(one.address, two.address, strictness);
       const totalAllocatedOne = await staker.totalAllocated(one.address, strictness);
-      const allocatedPriceOne = (totalAllocatedOne.sharePriceNum).div(totalAllocatedOne.sharePriceDenom); 
+      const allocatedPriceOne = (totalAllocatedOne.sharePriceNum).div(totalAllocatedOne.sharePriceDenom);
 
       // SHARE PRICE BEFORE ALLOCATION #2
       const price = await staker.sharePrice();
       const sharePrice = price[0].div(price[1]);
-   
+
       // ALLOCATE
       await staker.connect(one).allocate(parseEther(20), two.address, strictness);
 
       // NEW ALLOCATION DETAILS (W/ NEW SHARE PRICE)
       const oneTwoAllocationTwo = await staker.allocations(one.address, two.address, strictness);
       const totalAllocatedTwo = await staker.totalAllocated(one.address, strictness);
-      const allocatedPriceTwo = (totalAllocatedTwo.sharePriceNum).div(totalAllocatedTwo.sharePriceDenom); 
+      const allocatedPriceTwo = (totalAllocatedTwo.sharePriceNum).div(totalAllocatedTwo.sharePriceDenom);
 
       // ESTIMATE NEW SHARE PRICE
       const priceIncrease = (sharePrice).sub(allocatedPriceOne);
@@ -477,7 +478,7 @@ describe("ALLOCATION", () => {
     it("dump, deposit, allocate, accrue, distribute, withdraw deposited returns correct getUserInfo", async () => {
       const depositAmount = parseEther(5e3);
       // DUMP
-      
+
       // Deposit as one to mint some shares
       await staker.connect(one).deposit(parseEther(10e3), one.address);
 
@@ -491,7 +492,7 @@ describe("ALLOCATION", () => {
 
       // getUserInfo (1)
       let userData = await staker.getUserInfo(three.address);
-      
+
       let totalStaked = await staker.totalStaked();
       let totalShares = await staker.totalSupply();
       let totalRewards = await staker.totalRewards();
@@ -516,7 +517,7 @@ describe("ALLOCATION", () => {
         sharePrice,
       )
       let stakerEpsilon = 1e4;
-      
+
       expect(userData[0]).to.equal(maxRedeemableBeforeAccrue);
       expect(userData[1]).to.greaterThanOrEqual(depositAmount);
 
@@ -527,7 +528,7 @@ describe("ALLOCATION", () => {
 
       // ACCRUE
       await submitCheckpoint(0);
-      
+
 
       totalStaked = await staker.totalStaked();
       totalShares = await staker.totalSupply();
@@ -541,7 +542,7 @@ describe("ALLOCATION", () => {
         constants.PHI,
         constants.PHI_PRECISION
       )
-      let userTruMATIC : BigNumber = await staker.balanceOf(three.address);  
+      let userTruMATIC : BigNumber = await staker.balanceOf(three.address);
       let userMATIC = userTruMATIC.mul(sharePrice[0]).div(sharePrice[1]).div(parseEther(1))
 
       let maxRedeemableAfterAccrue = calculateSharesFromAmount(
@@ -558,17 +559,17 @@ describe("ALLOCATION", () => {
       expect(userData[4]).to.equal(previousEpoch.add(1))
 
       // DISTRIBUTE
-      await staker.connect(three).distributeRewards(four.address, three.address, strictness);
+      await staker.connect(three).distributeRewards(four.address, three.address, strictness, distributionInMATIC);
 
       // getUserInfo (3)
       userData = await staker.getUserInfo(three.address);
-      
+
       expect(userData[0]).to.be.lessThan(maxRedeemableBeforeAccrue);
       expect(userData[0]).to.lessThan(maxRedeemableAfterAccrue);
-      
-      // user distributed their rewards, so now less matic 
+
+      // user distributed their rewards, so now less MATIC
       expect(userData[1]).to.be.lessThan(userMATIC);
-      
+
       // +/-5 inaccuracy due to rounding range
       expect(userData[1]).to.lessThanOrEqual(depositAmount.add(stakerEpsilon).add(5));
       expect(userData[1]).to.greaterThanOrEqual(depositAmount.add(stakerEpsilon).sub(5));
@@ -588,7 +589,7 @@ describe("ALLOCATION", () => {
 
       // getUserInfo (1)
       let userData = await staker.getUserInfo(three.address);
-      
+
       let totalStaked = await staker.totalStaked();
       let totalShares = await staker.totalSupply();
       let totalRewards = await staker.totalRewards();
@@ -613,7 +614,7 @@ describe("ALLOCATION", () => {
         sharePrice,
       )
       let stakerEpsilon = 1e4;
-      
+
       expect(userData[0]).to.equal(maxRedeemableBeforeAccrue);
       expect(userData[1]).to.greaterThanOrEqual(depositAmount);
 
@@ -625,7 +626,7 @@ describe("ALLOCATION", () => {
       // ACCRUE
       await submitCheckpoint(2);
       await submitCheckpoint(3);
-      
+
 
       totalStaked = await staker.totalStaked();
       totalShares = await staker.totalSupply();
@@ -639,7 +640,7 @@ describe("ALLOCATION", () => {
         constants.PHI,
         constants.PHI_PRECISION
       )
-      let userTruMATIC : BigNumber = await staker.balanceOf(three.address);  
+      let userTruMATIC : BigNumber = await staker.balanceOf(three.address);
       let userMATIC = userTruMATIC.mul(sharePrice[0]).div(sharePrice[1]).div(parseEther(1))
 
       let maxRedeemableAfterAccrue = calculateSharesFromAmount(
@@ -656,17 +657,17 @@ describe("ALLOCATION", () => {
       expect(userData[4]).to.equal(previousEpoch.add(2))
 
       // DISTRIBUTE
-      await staker.connect(three).distributeRewards(four.address, three.address, strictness);
+      await staker.connect(three).distributeRewards(four.address, three.address, strictness, distributionInMATIC);
 
       // getUserInfo (3)
       userData = await staker.getUserInfo(three.address);
-      
+
       expect(userData[0]).to.be.lessThan(maxRedeemableBeforeAccrue);
       expect(userData[0]).to.lessThan(maxRedeemableAfterAccrue);
-      
-      // user distributed their rewards, so now less matic 
+
+      // user distributed their rewards, so now less MATIC
       expect(userData[1]).to.be.lessThan(userMATIC);
-      
+
       // +/-5 inaccuracy due to rounding range
       expect(userData[1]).to.lessThanOrEqual(depositAmount.add(stakerEpsilon).add(5));
       expect(userData[1]).to.greaterThanOrEqual(depositAmount.add(stakerEpsilon).sub(5));
@@ -676,10 +677,10 @@ describe("ALLOCATION", () => {
       await staker.connect(one).allocate(parseEther(1000), two.address, strictness);
       await staker.connect(one).allocate(parseEther(2000), three.address, strictness);
       await submitCheckpoint(0);
-  
+
       await staker.connect(one).transfer(two.address, await staker.balanceOf(one.address));
       await expect(
-        staker.connect(one).distributeAll(one.address, strictness)
+        staker.connect(one).distributeAll(one.address, strictness, distributionInMATIC)
       ).to.be.revertedWith("ERC20: transfer amount exceeds balance");
     });
 
@@ -699,13 +700,14 @@ describe("ALLOCATION", () => {
     });
 
   });
-  
+
 
 
   describe("STRICT", () => {
     // All exclusively strict tests go in here
 
     const strictness = true;
+    const distributionInMATIC = false;
 
     beforeEach(async () => {
       // Turn `allowStrict` on
@@ -718,7 +720,7 @@ describe("ALLOCATION", () => {
       // Allocate 10k
       await staker.connect(one).allocate(parseEther(5000), two.address, strictness);
       await staker.connect(one).allocate(parseEther(5000), two.address, strictness);
-  
+
       // Check sum is correct
       const oneTwoAllocationStrict = await staker.allocations(one.address, two.address, strictness);
       expect(oneTwoAllocationStrict.maticAmount).to.equal(parseEther(10000));
@@ -727,30 +729,30 @@ describe("ALLOCATION", () => {
     it("pass: first allocation updates state accordingly", async () => {
       // Allocate 1k
       await staker.connect(one).allocate(parseEther(1000), two.address, strictness);
-      
+
       const sharePriceFraction = await staker.sharePrice();
-      
+
       // Check values are correctly saved into allocation structs, no math required as first allocation
-      
+
       const oneTwoAllocation = await staker.allocations(one.address, two.address, strictness);
-      
+
       expect(oneTwoAllocation.maticAmount).to.equal(parseEther(1000));
       expect(
         oneTwoAllocation.sharePriceNum.div(oneTwoAllocation.sharePriceDenom)
       ).to.equal(parseEther(1));
       expect(oneTwoAllocation.sharePriceNum).to.equal(sharePriceFraction[0]);
       expect(oneTwoAllocation.sharePriceDenom).to.equal(sharePriceFraction[1]);
-      
+
       // Check values are correctly saved into total allocated struct, no math required as first allocation
-      
+
       const oneTotalAllocated = await staker.totalAllocated(one.address, strictness);
-      
+
       expect(oneTotalAllocated.maticAmount).to.equal(parseEther(1000));
       expect(oneTotalAllocated.sharePriceNum).to.equal(sharePriceFraction[0]);
       expect(oneTotalAllocated.sharePriceDenom).to.equal(sharePriceFraction[1]);
-      
+
       // Check if address one and two have correct first element in dist/recipient array
-      
+
       expect(await staker.distributors(two.address, strictness, 0)).to.equal(one.address);
       expect(await staker.recipients(one.address, strictness, 0)).to.equal(two.address);
 
@@ -769,17 +771,17 @@ describe("ALLOCATION", () => {
       await staker.connect(one).deposit(parseEther(20000),one.address);
       let firstAllocationAmount = parseEther(1000);
       let secondAllocationAmount = parseEther(2000);
-      
+
       let sharePriceFractionOld = await staker.sharePrice();
-      
+
       // Double check share price starts as 1e18
       expect(sharePriceFractionOld[0].div(sharePriceFractionOld[1])).to.equal(parseEther(1));
-      
+
       // Allocate 1k one-two
       await staker.connect(one).allocate(firstAllocationAmount, two.address, strictness);
-      
+
       // First allocation so allocation and total allocated should have same values for everything
-      
+
       let oneTwoAllocation = await staker.allocations(one.address, two.address, strictness);
       expect(oneTwoAllocation.maticAmount).to.equal(firstAllocationAmount);
       expect(oneTwoAllocation.sharePriceNum).to.equal(sharePriceFractionOld[0]);
@@ -800,12 +802,12 @@ describe("ALLOCATION", () => {
        // Allocate 2k more to user two
        await staker.connect(one).allocate(secondAllocationAmount, two.address, strictness);
        // The one-two allocation struct should have the same amt but share price should have changed
-     
+
        let oneTwoAllocationNew = await staker.allocations(one.address, two.address, strictness);
        expect(oneTwoAllocationNew.maticAmount).to.equal(
          firstAllocationAmount.add(secondAllocationAmount)
        );
-       
+
        let oneTotalAllocatedNew = await staker.totalAllocated(one.address, strictness);
        expect(oneTotalAllocatedNew.maticAmount).to.equal(
          firstAllocationAmount.add(secondAllocationAmount)
@@ -815,13 +817,13 @@ describe("ALLOCATION", () => {
        .mul(parseEther(1))
        .mul(sharePriceFractionOld[1])
        .div(sharePriceFractionOld[0]);
-       
+
        // Div allocated amount by spx to get share count
        let currentAllocationTheoreticalSharecount = secondAllocationAmount
        .mul(parseEther(1))
        .mul(sharePriceFractionNew[1])
        .div(sharePriceFractionNew[0]);
-       
+
        let averageTheoreticalSharePrice = firstAllocationAmount.add(secondAllocationAmount)
        .mul(parseEther(1))
        .div(priorAllocationTheoreticalSharecount.add(currentAllocationTheoreticalSharecount));
@@ -837,7 +839,7 @@ describe("ALLOCATION", () => {
        sharePriceFractionOld = [oneTwoAllocationNew.sharePriceNum,oneTwoAllocationNew.sharePriceDenom]
        firstAllocationAmount = firstAllocationAmount.add(secondAllocationAmount);
      }
-      
+
       // Also check distributor and recipient arrays
       expect(await staker.getDistributors(two.address, strictness)).to.eql([one.address]);
       expect(await staker.getRecipients(one.address, strictness)).to.eql([two.address]);
@@ -845,105 +847,105 @@ describe("ALLOCATION", () => {
 
     it("pass: multiple allocations to different people work correctly", async () => {
       const sharePriceFractionOld = await staker.sharePrice();
-  
+
       const oneTwoAllocatedAmount = parseEther(1000);
       const oneThreeAllocatedAmount = parseEther(2000);
       const oneFourAllocatedAmount = parseEther(2000);
-      
+
       const amountAllocatedWithOldSharePrice = oneTwoAllocatedAmount.add(oneThreeAllocatedAmount);
       const amountAllocatedWithNewSharePrice = oneFourAllocatedAmount;
-  
+
       // One allocates 1k to two, 2k to three
       await staker.connect(one).allocate(oneTwoAllocatedAmount, two.address, strictness);
       await staker.connect(one).allocate(oneThreeAllocatedAmount, three.address, strictness);
-      
+
       // Check one total allocated values are stored correctly
       const oneTotalAllocated = await staker.totalAllocated(one.address, strictness);
       expect(oneTotalAllocated.maticAmount).to.equal(amountAllocatedWithOldSharePrice);
       expect(
         oneTotalAllocated.sharePriceNum.div(oneTotalAllocated.sharePriceDenom)
       ).to.equal(sharePriceFractionOld[0].div(sharePriceFractionOld[1]));
-      
+
       // Accrue rewards
       await submitCheckpoint(0);
-       
+
       // Rewards are on validator, dust should be 10% of rewards
       // Check dust is indeed equal to 10% of rewards on validator
-      const totalRewards = await staker.totalRewards();   
+      const totalRewards = await staker.totalRewards();
       const dust = await staker.getDust();
       const calculatedDust = (totalRewards)
         .mul(constants.PHI)
         .div(constants.PHI_PRECISION);
       expect(dust).to.equal(calculatedDust);
-  
+
       // Four deposits 1k
       await staker.connect(four).deposit(parseEther(1000), four.address);
       const sharePriceFractionNew = await staker.sharePrice();
-  
+
       // With new deposit, rewards were swept up and dumped into contract,
       //   so dust should be 0 and shares minted to treasury
       expect(await staker.getDust()).to.equal(0);
       expect(
         await staker.balanceOf(treasury.address)
       ).to.equal(calculateTrsyWithdrawFees(totalRewards, [sharePriceFractionNew[0], sharePriceFractionNew[1]]));
-  
+
       // Four allocates .5k to three, one allocates 2k to four
       await staker.connect(four).allocate(parseEther(500), three.address, strictness);
       await staker.connect(one).allocate(oneFourAllocatedAmount, four.address, strictness);
-  
+
       // Check allocation values for all current allocations are correct
-  
+
       const oneTwoAllocation = await staker.allocations(one.address, two.address, strictness);
       expect(oneTwoAllocation.maticAmount).to.equal(oneTwoAllocatedAmount);
       expect(oneTwoAllocation.sharePriceNum).to.equal(sharePriceFractionOld[0]);
       expect(oneTwoAllocation.sharePriceDenom).to.equal(sharePriceFractionOld[1]);
-      
+
       const oneThreeAllocation = await staker.allocations(one.address, three.address, strictness);
       expect(oneThreeAllocation.maticAmount).to.equal(oneThreeAllocatedAmount);
       expect(oneThreeAllocation.sharePriceNum).to.equal(sharePriceFractionOld[0]);
       expect(oneThreeAllocation.sharePriceDenom).to.equal(sharePriceFractionOld[1]);
-      
+
       const oneFourAllocation = await staker.allocations(one.address, four.address, strictness);
       expect(oneFourAllocation.maticAmount).to.equal(oneFourAllocatedAmount);
       expect(oneFourAllocation.sharePriceNum).to.equal(sharePriceFractionNew[0]);
       expect(oneFourAllocation.sharePriceDenom).to.equal(sharePriceFractionNew[1]);
-  
+
       // Extra control test: unused for later checks
       const fourThreeAllocation = await staker.allocations(four.address, three.address, strictness);
       expect(fourThreeAllocation.maticAmount).to.equal(parseEther(500));
       expect(fourThreeAllocation.sharePriceNum).to.equal(sharePriceFractionNew[0]);
       expect(fourThreeAllocation.sharePriceDenom).to.equal(sharePriceFractionNew[1]);
-  
+
       // Find theoretical average share price and compare to actual share price
       //   use: old amount allocated * old price + new amount * new price / total amt
-      
+
       // Calculate theoretical values
-  
+
       const firstAllocationTheoreticalShareCount = amountAllocatedWithOldSharePrice // parseEther(3000)
         .mul(parseEther(1))
         .mul(sharePriceFractionOld[1])
         .div(sharePriceFractionOld[0]);
-      
+
       const secondAllocationTheoreticalShareCount = amountAllocatedWithNewSharePrice // parseEther(2000)
         .mul(parseEther(1))
         .mul(sharePriceFractionNew[1])
         .div(sharePriceFractionNew[0]);
-  
+
       // see above tests for explanation of these calculations
       const averageTheoreticalSharePrice = amountAllocatedWithOldSharePrice
         .add(amountAllocatedWithNewSharePrice)
         .mul(parseEther(1))
         .div(firstAllocationTheoreticalShareCount.add(secondAllocationTheoreticalShareCount));
-  
+
       // Get actual values
-  
+
       const oneTotalAllocatedNew = await staker.totalAllocated(one.address, strictness);
-  
+
       const oneTotalAllocationSharePrice = oneTotalAllocatedNew.sharePriceNum
         .div(oneTotalAllocatedNew.sharePriceDenom);
-  
+
       // Compare theoretical and actual values
-  
+
       expect(oneTotalAllocationSharePrice).to.equal(averageTheoreticalSharePrice);
     });
 
@@ -983,28 +985,28 @@ describe("ALLOCATION", () => {
       // ALLOCATE
       await staker.connect(one).allocate(parseEther(1000), two.address, strictness);
       await staker.connect(one).allocate(parseEther(1000), three.address, strictness);
-      
+
       // ACCRUE REWARDS
       for(let i = 0; i < numCheckpoints; i++){
       await submitCheckpoint(i);
       }
-  
+
       // ALLOCATE
       await staker.connect(one).allocate(parseEther(2000), two.address, strictness);
       await staker.connect(one).allocate(parseEther(2000), four.address, strictness);
-  
+
       // ARTIFICIALLY DOUBLE SHARE PRICE
       const sharePriceFracNew = await staker.sharePrice();
       const sharePriceDoubleNum = sharePriceFracNew[0].mul(2);
       const sharePriceDoubleDenom = sharePriceFracNew[1];
-  
+
       const oneTwoAllocation = await staker.allocations(one.address, two.address, strictness);
       const oneThreeAllocation = await staker.allocations(one.address, three.address, strictness);
       const oneFourAllocation = await staker.allocations(one.address, four.address, strictness);
-      
+
       // CALCULATE GAIN FOR EACH RECIPIENT
 
-      // Current Worth of MATIC: 
+      // Current Worth of MATIC:
       // MATIC(ALLOC)*INFLATED_NOW_SHARE_PRICE = TM (ALLOC)
       // TM(ALLOC)/SHARE_PRICE(ALLOC) = MATIC(ALLOC)
 
@@ -1019,7 +1021,7 @@ describe("ALLOCATION", () => {
           .div(sharePriceDoubleDenom)
           .div(parseEther(1))
           .sub(oneTwoAllocation.maticAmount));
-  
+
       const oneThreeMaticPnL = (
         (oneThreeAllocation.maticAmount)
           .mul(parseEther(1))
@@ -1029,7 +1031,7 @@ describe("ALLOCATION", () => {
           .div(sharePriceDoubleDenom)
           .div(parseEther(1))
           .sub(oneThreeAllocation.maticAmount));
-  
+
       const oneFourMaticPnL = (
         (oneFourAllocation.maticAmount)
           .mul(parseEther(1))
@@ -1048,19 +1050,19 @@ describe("ALLOCATION", () => {
     it("pass: distributing rewards works correctly for allocations", async () => {
       let numCheckpoints = 5;
       const sharePriceFractionOld = await staker.sharePrice();
-  
+
       // Set test values
       const oneTwoAllocationAmount = parseEther(1000);
       const oneThreeAllocationAmount1 = parseEther(2000);
       const oneThreeAllocationAmount2 = parseEther(500);
       const oneThreeAllocationAmount = oneThreeAllocationAmount1.add(oneThreeAllocationAmount2);
-  
+
       // One allocates 1k to two, 2k to three
       await staker.connect(one).allocate(oneTwoAllocationAmount, two.address, strictness);
       await staker.connect(one).allocate(oneThreeAllocationAmount1, three.address, strictness);
-      
+
       // Accrue rewards
-      
+
 
       // ACCRUE REWARDS
       for(let i = 0; i < numCheckpoints; i++){
@@ -1069,21 +1071,21 @@ describe("ALLOCATION", () => {
 
       // Save new share price for later checks
       const sharePriceFractionNew = await staker.sharePrice();
-      
+
       // One allocates .5k to three
       await staker.connect(one).allocate(oneThreeAllocationAmount2, three.address, strictness);
-  
+
       // Check total allocated values have been updated correctly following allocations
-  
+
       const oneTwoAllocationOld = await staker.allocations(one.address, two.address, strictness);
       expect(oneTwoAllocationOld.maticAmount).to.equal(oneTwoAllocationAmount);
       expect(oneTwoAllocationOld.sharePriceNum).to.equal(sharePriceFractionOld[0]);
       expect(oneTwoAllocationOld.sharePriceDenom).to.equal(sharePriceFractionOld[1]);
       // Share price of one-two allocation should just be original spx
-  
+
       const oneThreeAllocationOld = await staker.allocations(one.address, three.address, strictness);
       expect(oneThreeAllocationOld.maticAmount).to.equal(oneThreeAllocationAmount);
-      
+
       // Share price of one-three allocation should be weighted combination of two spxs
       // - calculated theoretical one-three share price
       // - 1 over the avg share price is equal to the weighted sum of 1 over the other
@@ -1099,129 +1101,129 @@ describe("ALLOCATION", () => {
       //     oneThreeAllocationAmount1 * sharePriceFracOld[1] / sharePriceFracOld[0] +
       //     oneThreeAllocationAmount2 * sharePriceFracNew[1] / sharePriceFracNew[0]
       //   )
-  
+
       const oneThreeAllocatedTheoreticalShareCount1 = oneThreeAllocationAmount1
         .mul(parseEther(1))
         .mul(sharePriceFractionOld[1])
         .div(sharePriceFractionOld[0]);
-      
+
       const oneThreeAllocatedTheoreticalShareCount2 = oneThreeAllocationAmount2
         .mul(parseEther(1))
         .mul(sharePriceFractionNew[1])
         .div(sharePriceFractionNew[0]);
-      
-      const oneThreeTheoreticalSharePriceAvg = 
+
+      const oneThreeTheoreticalSharePriceAvg =
         (
           oneThreeAllocationAmount1.add(oneThreeAllocationAmount2)
         ).mul(parseEther(1)).div(
           oneThreeAllocatedTheoreticalShareCount1.add(oneThreeAllocatedTheoreticalShareCount2)
         );
-  
+
       // Get actual one-three share price
-  
+
       const oneThreeAllocationOldSharePrice = oneThreeAllocationOld.sharePriceNum
         .div(oneThreeAllocationOld.sharePriceDenom);
-  
+
       // Expect equality
-  
+
       expect(oneThreeAllocationOldSharePrice).to.equal(oneThreeTheoreticalSharePriceAvg);
-  
+
       // Performing similar avg share price check but on total allocated for one
-  
+
       const oneTotalAllocatedOld = await staker.totalAllocated(one.address, strictness);
-      
+
       const oneTotalAllocatedTheoreticalShareCountOld = parseEther(3000)
         .mul(parseEther(1))
         .mul(sharePriceFractionOld[1])
         .div(sharePriceFractionOld[0]);
-      
+
       const oneTotalAllocatedTheoreticalShareCountNew = parseEther(500)
         .mul(parseEther(1))
         .mul(sharePriceFractionNew[1])
         .div(sharePriceFractionNew[0]);
-      
+
       const oneTotalAllocatedTheoreticalSharePriceAvg = (
         parseEther(3500)
       ).mul(parseEther(1)).div(
         oneTotalAllocatedTheoreticalShareCountOld.add(oneTotalAllocatedTheoreticalShareCountNew)
       );
-      
+
       expect(oneTotalAllocatedOld.maticAmount).to.equal(parseEther(3500));
-      
+
       const oneTotalAllocatedActual = oneTotalAllocatedOld.sharePriceNum
         .div(oneTotalAllocatedOld.sharePriceDenom);
-  
+
       expect(
         oneTotalAllocatedActual
       ).to.equal(
         oneTotalAllocatedTheoreticalSharePriceAvg
       );
-      
+
       // Save one balance for later checks
       const oneBalanceOld = await staker.balanceOf(one.address);
-      
+
       // One distributes all allocations
-      await staker.connect(one).distributeAll(one.address,strictness);
-      
+      await staker.connect(one).distributeAll(one.address,strictness, distributionInMATIC);
+
       // Check total allocateds following distribution of all of one's allocations
-  
+
       const oneTwoAllocationNew = await staker.allocations(one.address, two.address, strictness);
       expect(oneTwoAllocationNew.sharePriceNum).to.equal(sharePriceFractionNew[0]);
       expect(oneTwoAllocationNew.sharePriceDenom).to.equal(sharePriceFractionNew[1]);
-      
+
       const oneThreeAllocationNew = await staker.allocations(one.address, three.address, strictness);
       expect(oneThreeAllocationNew.sharePriceNum).to.equal(sharePriceFractionNew[0]);
       expect(oneThreeAllocationNew.sharePriceDenom).to.equal(sharePriceFractionNew[1]);
-      
-      const oneTotalAllocatedNew = await staker.totalAllocated(one.address, strictness); 
+
+      const oneTotalAllocatedNew = await staker.totalAllocated(one.address, strictness);
       expect(oneTotalAllocatedNew.maticAmount).to.equal(parseEther(3500));
       expect(oneTotalAllocatedNew.sharePriceNum).to.equal(sharePriceFractionNew[0]);
       expect(oneTotalAllocatedNew.sharePriceDenom).to.equal(sharePriceFractionNew[1]);
-  
-      // Distribution checks (check correct amount of tmatic was distributed)
-  
-      // One-two alloc amt div by one-two alloc old spx: tmatic at time of allocation
+
+      // Distribution checks (check correct amount of TruMATIC was distributed)
+
+      // One-two alloc amt div by one-two alloc old spx: TruMATIC at time of allocation
       const oneTwoSharesAllocatedOld = oneTwoAllocationNew.maticAmount
         .mul(parseEther(1))
         .mul(sharePriceFractionOld[1])
         .div(sharePriceFractionOld[0]);
-      
-      // One-two alloc amt div by new cur spx: tmatic at current share price
+
+      // One-two alloc amt div by new cur spx: TruMATIC at current share price
       const oneTwoSharesAllocatedNew = oneTwoAllocationNew.maticAmount
         .mul(parseEther(1))
         .mul(sharePriceFractionNew[1])
         .div(sharePriceFractionNew[0]);
-  
-      // Calculate tmatic to move
+
+      // Calculate TruMATIC to move
       const oneTwoSharePnL = oneTwoSharesAllocatedOld
         .sub(oneTwoSharesAllocatedNew)
         .sub(BigNumber.from("1")); // todo: check if this is necessary (use rounding)
-  
-      // Check two received the expected amount of tmatic
+
+      // Check two received the expected amount of TruMATIC
       expect(await staker.balanceOf(two.address)).to.equal(oneTwoSharePnL);
-  
-      // One-three alloc amt div by one-three alloc old spx: tmatic at time of allocation
+
+      // One-three alloc amt div by one-three alloc old spx: TruMATIC at time of allocation
       const oneThreeSharesAllocatedOld = oneThreeAllocationNew.maticAmount
         .mul(parseEther(1))
         .mul(oneThreeAllocationOld.sharePriceDenom)
         .div(oneThreeAllocationOld.sharePriceNum);
-      
-      // One-three alloc amt div by new cur spx: tmatic at current share price
+
+      // One-three alloc amt div by new cur spx: TruMATIC at current share price
       const oneThreeSharesAllocatedNew = oneThreeAllocationNew.maticAmount
         .mul(parseEther(1))
         .mul(sharePriceFractionNew[1])
         .div(sharePriceFractionNew[0]);
-    
-      // Calculate tmatic to move
-      const oneThreeSharePnL = oneThreeSharesAllocatedOld 
+
+      // Calculate TruMATIC to move
+      const oneThreeSharePnL = oneThreeSharesAllocatedOld
         .sub(oneThreeSharesAllocatedNew)
         .sub(BigNumber.from("1")); // todo: check if this is necessary
-  
-      // Check three received the expected amount of tmatic
+
+      // Check three received the expected amount of TruMATIC
       expect(await staker.balanceOf(three.address)).to.equal(oneThreeSharePnL);
-  
+
       // TruMATIC balance checks
-      
+
       // Check balances of two and three add to one's original balance
       expect(
         await staker.balanceOf(one.address)
@@ -1230,7 +1232,7 @@ describe("ALLOCATION", () => {
           .sub(await staker.balanceOf(two.address))
           .sub(await staker.balanceOf(three.address))
       );
-  
+
       // Check total TruMATIC supply is equal to all balances summed together
       expect(
         await staker.totalSupply()
@@ -1259,7 +1261,7 @@ describe("ALLOCATION", () => {
       for(let i = 0; i < numCheckpoints; i++){
       await submitCheckpoint(i);
       }
-      
+
       // Depositing as two since one already deposits 10k
       await staker.connect(two).deposit(parseEther(5), two.address);
 
@@ -1290,9 +1292,9 @@ describe("ALLOCATION", () => {
       let numCheckpoints = 5;
 
       const depositAmount = parseEther(5e3);
-      
+
       // DUMP
-      
+
       // Deposit as one to mint some shares
       await staker.connect(one).deposit(parseEther(10e3), one.address);
 
@@ -1315,7 +1317,7 @@ describe("ALLOCATION", () => {
       }
 
       // DISTRIBUTE
-      await staker.connect(three).distributeRewards(four.address, three.address, strictness);
+      await staker.connect(three).distributeRewards(four.address, three.address, strictness, distributionInMATIC);
 
       // WITHDRAW
 
@@ -1325,7 +1327,7 @@ describe("ALLOCATION", () => {
 
     it("deposit, allocate, accrue, distribute, withdraw deposited amt", async () => {
       const depositAmount = parseEther(5e3);
-      
+
       // Deposit as one to mint some shares
       await staker.connect(one).deposit(parseEther(10e3), one.address);
 
@@ -1340,12 +1342,12 @@ describe("ALLOCATION", () => {
 
       // Allocate full deposited amount to five
       await staker.connect(three).allocate(depositAmount, four.address, strictness);
-      
+
       // accrue rewards
       await submitCheckpoint(3);
 
       // DISTRIBUTE
-      await staker.connect(three).distributeRewards(four.address, three.address, strictness);
+      await staker.connect(three).distributeRewards(four.address, three.address, strictness, distributionInMATIC);
 
       // accrue rewards
       await submitCheckpoint(4);
@@ -1368,17 +1370,17 @@ describe("ALLOCATION", () => {
 
     it("fail: allocating more than deposited", async () => {
       // Allocating all funds at once
-      
+
       await expect(
         staker.connect(one).allocate(parseEther(11000), two.address, strictness)
       ).to.be.revertedWithCustomError(staker, "InsufficientDistributorBalance");
-      
+
       // Allocating funds spread over two allocations (8000 + 3000 = 11000, > 10000).
       // This is explicitly tested particularly because this version *is* possible
       // in loose allocations, but not in strict allocations.
-  
+
       await staker.connect(one).allocate(parseEther(8000), two.address, strictness);
-      
+
       await expect(
         staker.connect(one).allocate(parseEther(3000), two.address, strictness)
       ).to.be.revertedWithCustomError(staker, "InsufficientDistributorBalance");
@@ -1389,15 +1391,15 @@ describe("ALLOCATION", () => {
         staker.connect(one).allocate(parseEther(0), two.address, strictness)
       ).to.be.revertedWithCustomError(staker, "AllocationUnderOneMATIC");
     });
-    
+
     it("fail: should be unable to transfer strictly allocated balance", async () => {
       await staker.connect(one).allocate(parseEther(1000), two.address, strictness);
-    
+
       await expect(
         staker.connect(one).transfer(three.address, parseEther(10000))
       ).to.be.revertedWithCustomError(staker, "ExceedsUnallocatedBalance");
     });
-    
+
     it("pass: checks that you can strictly allocate entire maxWithdraw amount (including epsilon)", async() => {
       const maxWithdrawAmount = await staker.maxWithdraw(one.address);
       // strict allocation of entire balance
@@ -1405,24 +1407,24 @@ describe("ALLOCATION", () => {
       const strictAllocation = await staker.allocations(one.address, two.address, strictness);
       expect(strictAllocation[0]).to.equal(maxWithdrawAmount);
     })
-    
+
     it("maxRedeemable in getUserInfo returns maxWithdraw when the max balance is strictly allocated", async() => {
       const maxWithdrawAmount = await staker.maxWithdraw(one.address);
 
       // strict allocation of entire balance
       await staker.connect(one).allocate(maxWithdrawAmount, two.address,  strictness);
       const strictAllocation = await staker.allocations(one.address, two.address, strictness);
-    
+
       const userMatic = await staker.getUserInfo(one.address);
       expect(strictAllocation[0]).to.equal(maxWithdrawAmount);
     })
   });
-  
+
 
 
   describe("BOTH", () => {
     // Tests which include both configurations of strictness go in here
-    
+
     // Strictness variable not set here to prevent accidentally referring to
     // the wrong strictness value. `true` and `false` literals should be used
     // for strictness in these tests.
@@ -1431,23 +1433,23 @@ describe("ALLOCATION", () => {
       // Turn `allowStrict` on
       await staker.connect(deployer).setAllowStrict(true);
     });
-    
+
     // Passing test cases
 
     it("pass: mix of strict & loose allocation update state accordingly", async () => {
       const strictness = true;
-      
+
       // Make strict and loose allocations and check allocations are saved correctly
-      
+
       // One strictly allocates 1k to two
       await staker.connect(one).allocate(parseEther(1000), two.address, strictness);
-      
+
       const sharePriceFraction = await staker.sharePrice();
-      
+
       // Check values saved into allocation struct as is, as it's the first allocation (no math)
-      
+
       const oneTwoAllocationStrict = await staker.allocations(one.address, two.address, strictness);
-      
+
       expect(oneTwoAllocationStrict.maticAmount).to.equal(parseEther(1000));
       expect(oneTwoAllocationStrict.sharePriceNum.div(oneTwoAllocationStrict.sharePriceDenom)).to.equal(parseEther(1));
       expect(oneTwoAllocationStrict.sharePriceNum).to.equal(sharePriceFraction[0]);
@@ -1455,17 +1457,17 @@ describe("ALLOCATION", () => {
 
       // One loosely allocates 1k to two
       await staker.connect(one).allocate(parseEther(1000), two.address, !strictness);
-      
+
       const oneTwoAllocationLoose = await staker.allocations(one.address, two.address, !strictness);
-      
+
       expect(oneTwoAllocationLoose.maticAmount).to.equal(parseEther(1000));
       expect(oneTwoAllocationLoose.sharePriceNum.div(oneTwoAllocationLoose.sharePriceDenom)).to.equal(parseEther(1));
 
       // One loosely allocates 1k to three
       await staker.connect(one).allocate(parseEther(1000), three.address, !strictness);
-      
+
       const oneThreeAllocationLoose = await staker.allocations(one.address, three.address, !strictness);
-      
+
       expect(oneThreeAllocationLoose.maticAmount).to.equal(parseEther(1000));
       expect(oneThreeAllocationLoose.sharePriceNum.div(oneThreeAllocationLoose.sharePriceDenom)).to.equal(parseEther(1));
 
@@ -1473,13 +1475,13 @@ describe("ALLOCATION", () => {
       // into allocation struct as is, as it's the first allocation (no math)
 
       const oneTotalAllocatedStrict = await staker.totalAllocated(one.address, strictness);
-      
+
       expect(oneTotalAllocatedStrict.maticAmount).to.equal(parseEther(1000));
       expect(oneTotalAllocatedStrict.sharePriceNum).to.equal(sharePriceFraction[0]);
       expect(oneTotalAllocatedStrict.sharePriceDenom).to.equal(sharePriceFraction[1]);
 
       const oneTotalAllocatedLoose = await staker.totalAllocated(one.address, !strictness);
-      
+
       expect(oneTotalAllocatedLoose.maticAmount).to.equal(parseEther(2000));
       expect(
         oneTotalAllocatedLoose.sharePriceNum.div(oneTotalAllocatedLoose.sharePriceDenom)
@@ -1490,29 +1492,29 @@ describe("ALLOCATION", () => {
       // One
       expect(await staker.getRecipients(one.address, strictness)).to.eql([two.address]);
       expect(await staker.getRecipients(one.address, !strictness)).to.eql([two.address, three.address]);
-      
+
       // Two
       expect(await staker.getDistributors(two.address, strictness)).to.eql([one.address]);
       expect(await staker.getDistributors(two.address, !strictness)).to.eql([one.address]);
-      
+
       // Three
       expect(await staker.getDistributors(three.address, !strictness)).to.eql([one.address]);
     });
 
     it("pass: mix of loose & strict allocation update state accordingly (opposite of previous case)", async () => {
       const strictness = false;
-      
+
       // Make strict and loose allocations and check allocations are saved correctly
-      
+
       // One strictly allocates 1k to two
       await staker.connect(one).allocate(parseEther(1000), two.address, strictness);
-      
+
       const sharePriceFraction = await staker.sharePrice();
-      
+
       // Check values saved into allocation struct as is, as it's the first allocation (no math)
-      
+
       const oneTwoAllocationStrict = await staker.allocations(one.address, two.address, strictness);
-      
+
       expect(oneTwoAllocationStrict.maticAmount).to.equal(parseEther(1000));
       expect(oneTwoAllocationStrict.sharePriceNum.div(oneTwoAllocationStrict.sharePriceDenom)).to.equal(parseEther(1));
       expect(oneTwoAllocationStrict.sharePriceNum).to.equal(sharePriceFraction[0]);
@@ -1520,17 +1522,17 @@ describe("ALLOCATION", () => {
 
       // One loosely allocates 1k to two
       await staker.connect(one).allocate(parseEther(1000), two.address, !strictness);
-      
+
       const oneTwoAllocationLoose = await staker.allocations(one.address, two.address, !strictness);
-      
+
       expect(oneTwoAllocationLoose.maticAmount).to.equal(parseEther(1000));
       expect(oneTwoAllocationLoose.sharePriceNum.div(oneTwoAllocationLoose.sharePriceDenom)).to.equal(parseEther(1));
 
       // One loosely allocates 1k to three
       await staker.connect(one).allocate(parseEther(1000), three.address, !strictness);
-      
+
       const oneThreeAllocationLoose = await staker.allocations(one.address, three.address, !strictness);
-      
+
       expect(oneThreeAllocationLoose.maticAmount).to.equal(parseEther(1000));
       expect(oneThreeAllocationLoose.sharePriceNum.div(oneThreeAllocationLoose.sharePriceDenom)).to.equal(parseEther(1));
 
@@ -1538,13 +1540,13 @@ describe("ALLOCATION", () => {
       // into allocation struct as is, as it's the first allocation (no math)
 
       const oneTotalAllocatedStrict = await staker.totalAllocated(one.address, strictness);
-      
+
       expect(oneTotalAllocatedStrict.maticAmount).to.equal(parseEther(1000));
       expect(oneTotalAllocatedStrict.sharePriceNum).to.equal(sharePriceFraction[0]);
       expect(oneTotalAllocatedStrict.sharePriceDenom).to.equal(sharePriceFraction[1]);
 
       const oneTotalAllocatedLoose = await staker.totalAllocated(one.address, !strictness);
-      
+
       expect(oneTotalAllocatedLoose.maticAmount).to.equal(parseEther(2000));
       expect(
         oneTotalAllocatedLoose.sharePriceNum.div(oneTotalAllocatedLoose.sharePriceDenom)
@@ -1555,11 +1557,11 @@ describe("ALLOCATION", () => {
       // One
       expect(await staker.getRecipients(one.address, strictness)).to.eql([two.address]);
       expect(await staker.getRecipients(one.address, !strictness)).to.eql([two.address, three.address]);
-      
+
       // Two
       expect(await staker.getDistributors(two.address, strictness)).to.eql([one.address]);
       expect(await staker.getDistributors(two.address, !strictness)).to.eql([one.address]);
-      
+
       // Three
       expect(await staker.getDistributors(three.address, !strictness)).to.eql([one.address]);
     });
@@ -1576,12 +1578,12 @@ describe("ALLOCATION", () => {
   // });
 
   // it("17 pass: three allocations to different users, with two accruals in between", async () => {
-    
+
   // });
 
   // it("18 pass: multiple allocations shouldn't cause an overflow", async () => {
   //   // This test was used for manual testing originally (hence console logs).
-    
+
   //   // It could still be useful for seeing how the numerator an denominator
   //   // of share price change with different calls when manually run, so it's
   //   // fine to keep this test in with commented console logs.
@@ -1622,16 +1624,16 @@ describe("ALLOCATION", () => {
   //   // one allocates 1k to two, 2k to three
   //   await staker.connect(one).allocate(parseEther(1000), two.address, strict);
   //   await staker.connect(one).allocate(parseEther(2000), three.address, strict);
-    
+
   //   // accrue rewards
   //   await submitCheckpoint(stakeManager, txdata["data"]);
-    
+
   //   // four deposits 1k
   //   await staker.connect(four).deposit(parseEther(1000), four.address);
 
   //   // save new share price for later checks
   //   const sharePriceFracNew = await staker.sharePrice();
-    
+
   //   // one allocated .5k to three
   //   await staker.connect(one).allocate(parseEther(500), three.address, strict);
 
@@ -1671,43 +1673,43 @@ describe("ALLOCATION", () => {
   //   expect(
   //     oneTotalAllocatedOld.sharePriceNum.div(oneTotalAllocatedOld.sharePriceDenom)
   //   ).to.equal(oneTotalAllocatedTheoreticalSharePriceAvg);
-    
+
   //   // save one balance for later checks
   //   const oneBalanceOld = await staker.balanceOf(one.address);
 
   //   // one distributes all allocations
   //   await staker.connect(one).distributeAll(one.address,strict);
-    
+
   //   // check total allocateds following distribution of all of one's allocations
 
   //   const oneTwoAllocationNew = await staker.allocations(one.address, two.address, strict);
   //   expect(oneTwoAllocationNew.sharePriceNum).to.equal(sharePriceFracNew[0]);
   //   expect(oneTwoAllocationNew.sharePriceDenom).to.equal(sharePriceFracNew[1]);
-    
+
   //   const oneThreeAllocationNew = await staker.allocations(one.address, three.address, strict);
   //   expect(oneThreeAllocationNew.sharePriceNum).to.equal(sharePriceFracNew[0]);
   //   expect(oneThreeAllocationNew.sharePriceDenom).to.equal(sharePriceFracNew[1]);
-    
-  //   const oneTotalAllocatedNew = await staker.totalAllocated(one.address, strict); 
+
+  //   const oneTotalAllocatedNew = await staker.totalAllocated(one.address, strict);
   //   expect(oneTotalAllocatedNew.maticAmount).to.equal(parseEther(3500));
   //   expect(oneTotalAllocatedNew.sharePriceNum).to.equal(sharePriceFracNew[0]);
   //   expect(oneTotalAllocatedNew.sharePriceDenom).to.equal(sharePriceFracNew[1]);
 
-  //   // distribution checks (check correct amount of tmatic was distributed)
+  //   // distribution checks (check correct amount of TruMATIC was distributed)
 
-  //   // one-two alloc amt div by one-two alloc old spx: tmatic at time of allocation
+  //   // one-two alloc amt div by one-two alloc old spx: TruMATIC at time of allocation
   //   const oneTwoSharesAllocatedOld = oneTwoAllocationNew.maticAmount
   //     .mul(parseEther(1))
   //     .mul(oneTwoAllocationOld.sharePriceDenom)
   //     .div(oneTwoAllocationOld.sharePriceNum);
-    
-  //   // one-two alloc amt div by new cur spx: tmatic at current share price
+
+  //   // one-two alloc amt div by new cur spx: TruMATIC at current share price
   //   const oneTwoSharesAllocatedNew = oneTwoAllocationNew.maticAmount
   //     .mul(parseEther(1))
   //     .mul(sharePriceFracNew[1])
   //     .div(sharePriceFracNew[0]);
 
-  //   // calculate tmatic to move
+  //   // calculate TruMATIC to move
   //   const oneTwoSharePnL = oneTwoSharesAllocatedOld
   //     .sub(oneTwoSharesAllocatedNew)
   //     .sub(BigNumber.from("1")); // todo: check if this is necessary
@@ -1718,31 +1720,31 @@ describe("ALLOCATION", () => {
 
   //   // -> may be because of fee (probably this) -- fee is only taken in loose allocations
 
-  //   // check two received the expected amount of tmatic
+  //   // check two received the expected amount of TruMATIC
   //   expect(await staker.balanceOf(two.address)).to.equal(oneTwoSharePnL);
 
-  //   // one-three alloc amt div by one-three alloc old spx: tmatic at time of allocation
+  //   // one-three alloc amt div by one-three alloc old spx: TruMATIC at time of allocation
   //   const oneThreeSharesAllocatedOld = oneThreeAllocationNew.maticAmount
   //     .mul(parseEther(1))
   //     .mul(oneThreeAllocationOld.sharePriceDenom)
   //     .div(oneThreeAllocationOld.sharePriceNum);
 
-  //   // one-three alloc amt div by new cur spx: tmatic at current share price
+  //   // one-three alloc amt div by new cur spx: TruMATIC at current share price
   //   const oneThreeSharesAllocatedNew = oneThreeAllocationNew.maticAmount
   //     .mul(parseEther(1))
   //     .mul(sharePriceFracNew[1])
   //     .div(sharePriceFracNew[0]);
-  
-  //   // calculate tmatic to move
-  //   const oneThreeSharePnL = oneThreeSharesAllocatedOld 
+
+  //   // calculate TruMATIC to move
+  //   const oneThreeSharePnL = oneThreeSharesAllocatedOld
   //     .sub(oneThreeSharesAllocatedNew)
   //     .sub(BigNumber.from("1")); // todo: check if this is necessary
 
-  //   // check three received the expected amount of tmatic
+  //   // check three received the expected amount of TruMATIC
   //   expect(await staker.balanceOf(three.address)).to.equal(oneThreeSharePnL);
 
   //   // TruMATIC balance checks
-    
+
   //   // check balances of two and three add to one's original balance
   //   expect(
   //     await staker.balanceOf(one.address)

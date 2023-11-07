@@ -9,7 +9,7 @@ import { parseEther } from "../helpers/math";
 import { submitCheckpoint } from "../helpers/state-interaction";
 
 describe("DEALLOCATE", () => {
-  let owner, allocatorOne, allocatorTwo, recipientOne, recipientTwo, staker, strictness;
+  let owner, allocatorOne, allocatorTwo, recipientOne, recipientTwo, staker, strictness, distributionInMATIC;
 
   // Test constants
   const ALLOCATED_AMOUNT = parseEther(10000);
@@ -32,8 +32,9 @@ describe("DEALLOCATE", () => {
 describe("LOOSE", () => {
   beforeEach(async () => {
     strictness = false;
+    distributionInMATIC = false;
     // Deposit and allocated ALLOCATED_AMOUNT to recipientOne
-    await staker.connect(allocatorOne).allocate(ALLOCATED_AMOUNT, recipientOne.address, strictness);    
+    await staker.connect(allocatorOne).allocate(ALLOCATED_AMOUNT, recipientOne.address, strictness);
   });
 
   it("Emits 'Deallocated' event with expected parameters", async () => {
@@ -59,7 +60,7 @@ describe("LOOSE", () => {
   it("Reverts if caller has not made an allocation to the input recipient", async () => {
     await expect(
       staker.connect(allocatorOne).deallocate(ALLOCATED_AMOUNT, recipientTwo.address, strictness)
-    ).to.be.revertedWithCustomError(staker, "NoRewardsAllocatedToRecipient");
+    ).to.be.revertedWithCustomError(staker, "AllocationNonExistent");
   });
 
   it("Reverts via underflow if deallocated amount larger than allocated amount", async () => {
@@ -237,7 +238,7 @@ describe("LOOSE", () => {
       await staker.connect(allocatorOne).deallocate(HALVING_REDUCTION, recipientTwo.address, strictness);
 
       // Distribute rewards to recipients
-      await staker.connect(allocatorOne).distributeAll(allocatorOne.address, strictness);
+      await staker.connect(allocatorOne).distributeAll(allocatorOne.address, strictness, distributionInMATIC);
 
       const recipientOneRewards = await staker.balanceOf(recipientOne.address);
       const recipientTwoRewards = await staker.balanceOf(recipientTwo.address);
@@ -264,7 +265,7 @@ describe("LOOSE", () => {
       await staker.connect(allocatorOne).deallocate(EQUALISING_REDUCTION, recipientOne.address, strictness);
 
       // Distribute rewards to recipients
-      await staker.connect(allocatorOne).distributeAll(allocatorOne.address, strictness);
+      await staker.connect(allocatorOne).distributeAll(allocatorOne.address, strictness, distributionInMATIC);
 
       const recipientOneRewards = await staker.balanceOf(recipientOne.address);
       const recipientTwoRewards = await staker.balanceOf(recipientTwo.address);
@@ -279,7 +280,7 @@ describe("LOOSE", () => {
 
       // distribute rewards and check that TruMATIC balance of recipient increases
       let preBalOne = await staker.balanceOf(recipientOne.address);
-      await staker.connect(allocatorOne).distributeRewards(recipientOne.address,allocatorOne.address,strictness);
+      await staker.connect(allocatorOne).distributeRewards(recipientOne.address, allocatorOne.address, strictness, distributionInMATIC);
       let postBalOne = await staker.balanceOf(recipientOne.address);
 
       expect(postBalOne).to.be.gt(preBalOne);
@@ -287,27 +288,27 @@ describe("LOOSE", () => {
       // accrue rewards
       await submitCheckpoint(1);
 
-      // deallocate at a higher price 
-      await staker.connect(allocatorOne).deallocate(ALLOCATED_AMOUNT,recipientOne.address,strictness);
+      // deallocate at a higher price
+      await staker.connect(allocatorOne).deallocate(ALLOCATED_AMOUNT, recipientOne.address, strictness);
 
       //ensure that rewards were not distributed before deallocating
       expect(await staker.balanceOf(recipientOne.address)).to.equal(postBalOne);
 
       //ensure individualAllocation was deleted
-      let individualAllocationCP1 = await staker.allocations(allocatorOne.address,recipientOne.address,strictness);
+      let individualAllocationCP1 = await staker.allocations(allocatorOne.address, recipientOne.address, strictness);
       expect(individualAllocationCP1.maticAmount).to.equal(0);
       expect(individualAllocationCP1.sharePriceNum).to.equal(0);
 
       // allocate again
-      await staker.connect(allocatorOne).allocate(parseEther(1000),recipientOne.address,strictness);
-      individualAllocationCP1 = await staker.allocations(allocatorOne.address,recipientOne.address,strictness);
-      
+      await staker.connect(allocatorOne).allocate(parseEther(1000),recipientOne.address, strictness);
+      individualAllocationCP1 = await staker.allocations(allocatorOne.address, recipientOne.address, strictness);
+
       //accrue rewards
       await submitCheckpoint(2);
 
       //allocate at a higher price and ensure mapping reflects a non-zero share price
-      await staker.connect(allocatorOne).allocate(parseEther(1000),recipientOne.address,strictness);
-      const individualAllocationCP2 = await staker.allocations(allocatorOne.address,recipientOne.address,strictness);
+      await staker.connect(allocatorOne).allocate(parseEther(1000),recipientOne.address, strictness);
+      const individualAllocationCP2 = await staker.allocations(allocatorOne.address, recipientOne.address, strictness);
       expect(individualAllocationCP2.sharePriceNum).to.not.equal(0);
       expect(individualAllocationCP1.sharePriceNum.div(individualAllocationCP1.sharePriceDenom)).to.be.lt(individualAllocationCP2.sharePriceNum.div(individualAllocationCP2.sharePriceDenom));
 
@@ -317,7 +318,7 @@ describe("LOOSE", () => {
       //distribute all and check that recipient's TruMATIC balance increased and allocator's balance decreased
       preBalOne = await staker.balanceOf(recipientOne.address);
       let preBalAllocator = await staker.balanceOf(allocatorOne.address);
-      await staker.connect(allocatorOne).distributeAll(allocatorOne.address,strictness);
+      await staker.connect(allocatorOne).distributeAll(allocatorOne.address, strictness, distributionInMATIC);
       postBalOne = await staker.balanceOf(recipientOne.address);
       let postBalAllocator = await staker.balanceOf(allocatorOne.address);
 
@@ -326,10 +327,10 @@ describe("LOOSE", () => {
       expect(postBalAllocator).to.be.lt(preBalAllocator);
 
       //check allocation mapping was updated to current share price
-      const individualAllocationCP3 = await staker.allocations(allocatorOne.address,recipientOne.address,strictness);
+      const individualAllocationCP3 = await staker.allocations(allocatorOne.address, recipientOne.address, strictness);
       const sp = await staker.sharePrice();
       expect(individualAllocationCP3.sharePriceNum).to.equal(sp[0]);
-      expect(individualAllocationCP3.sharePriceDenom).to.equal(sp[1]); 
+      expect(individualAllocationCP3.sharePriceDenom).to.equal(sp[1]);
     });
   });
 });
@@ -343,7 +344,6 @@ describe("LOOSE", () => {
     });
 
     it("Simple deallocation pre reward accrual", async () => {
-      console.log(strictness);
       const recipientOneInitialBalance = await staker.balanceOf(recipientOne.address);
       await expect(staker.connect(allocatorOne).deallocate(1, recipientOne.address, strictness)).to.emit(
         staker,
@@ -457,7 +457,7 @@ describe("LOOSE", () => {
 
       // distribute rewards and check that TruMATIC balance of recipient increases
       let preBalOne = await staker.balanceOf(recipientOne.address);
-      await staker.connect(allocatorOne).distributeRewards(recipientOne.address,allocatorOne.address,strictness);
+      await staker.connect(allocatorOne).distributeRewards(recipientOne.address, allocatorOne.address, strictness, distributionInMATIC);
       let postBalOne = await staker.balanceOf(recipientOne.address);
 
       expect(postBalOne).to.be.gt(preBalOne);
@@ -465,27 +465,27 @@ describe("LOOSE", () => {
       // accrue rewards
       await submitCheckpoint(1);
 
-      // deallocate at higher price 
-      await staker.connect(allocatorOne).deallocate(ALLOCATED_AMOUNT,recipientOne.address,strictness);
+      // deallocate at higher price
+      await staker.connect(allocatorOne).deallocate(ALLOCATED_AMOUNT, recipientOne.address, strictness);
 
       //ensure that rewards were distributed before deallocating
       expect(await staker.balanceOf(recipientOne.address)).to.be.gt(postBalOne);
 
       //ensure individualAllocation was deleted
-      let individualAllocationCP1 = await staker.allocations(allocatorOne.address,recipientOne.address,strictness);
+      let individualAllocationCP1 = await staker.allocations(allocatorOne.address, recipientOne.address, strictness);
       expect(individualAllocationCP1.maticAmount).to.equal(0);
       expect(individualAllocationCP1.sharePriceNum).to.equal(0);
 
       // allocate again
-      await staker.connect(allocatorOne).allocate(parseEther(1000),recipientOne.address,strictness);
-      individualAllocationCP1 = await staker.allocations(allocatorOne.address,recipientOne.address,strictness);
-      
+      await staker.connect(allocatorOne).allocate(parseEther(1000), recipientOne.address, strictness);
+      individualAllocationCP1 = await staker.allocations(allocatorOne.address, recipientOne.address, strictness);
+
       //accrue rewards
       await submitCheckpoint(2);
 
       //allocate at a higher price and ensure mapping was updated accordingly
-      await staker.connect(allocatorOne).allocate(parseEther(1000),recipientOne.address,strictness);
-      const individualAllocationCP2 = await staker.allocations(allocatorOne.address,recipientOne.address,strictness);
+      await staker.connect(allocatorOne).allocate(parseEther(1000), recipientOne.address, strictness);
+      const individualAllocationCP2 = await staker.allocations(allocatorOne.address, recipientOne.address, strictness);
       expect(individualAllocationCP2.sharePriceNum).to.not.equal(0);
       expect(individualAllocationCP1.sharePriceNum.div(individualAllocationCP1.sharePriceDenom)).to.be.lt(individualAllocationCP2.sharePriceNum.div(individualAllocationCP2.sharePriceDenom));
 
@@ -495,7 +495,7 @@ describe("LOOSE", () => {
       //distribute all and check that recipient's TruMATIC balance increased and allocator's balance decreased
       preBalOne = await staker.balanceOf(recipientOne.address);
       let preBalAllocator = await staker.balanceOf(allocatorOne.address);
-      await staker.connect(allocatorOne).distributeAll(allocatorOne.address,strictness);
+      await staker.connect(allocatorOne).distributeAll(allocatorOne.address, strictness, distributionInMATIC);
       postBalOne = await staker.balanceOf(recipientOne.address);
       let postBalAllocator = await staker.balanceOf(allocatorOne.address);
 
@@ -504,10 +504,10 @@ describe("LOOSE", () => {
       expect(postBalAllocator).to.be.lt(preBalAllocator);
 
       //check allocation mapping was updated to current share price
-      const individualAllocationCP3 = await staker.allocations(allocatorOne.address,recipientOne.address,strictness);
+      const individualAllocationCP3 = await staker.allocations(allocatorOne.address, recipientOne.address, strictness);
       const sp = await staker.sharePrice();
       expect(individualAllocationCP3.sharePriceNum).to.equal(sp[0]);
-      expect(individualAllocationCP3.sharePriceDenom).to.equal(sp[1]); 
+      expect(individualAllocationCP3.sharePriceDenom).to.equal(sp[1]);
     });
   });
 

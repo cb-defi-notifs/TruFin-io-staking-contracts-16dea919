@@ -1,6 +1,6 @@
 import { expect } from "chai";
 import { ethers, upgrades } from "hardhat";
-import { BigNumber, Contract } from "ethers";
+import { smock } from '@defi-wonderland/smock';
 import { AddressZero } from "@ethersproject/constants";
 import * as helpers from "@nomicfoundation/hardhat-network-helpers";
 import * as constants from "../helpers/constants";
@@ -52,31 +52,28 @@ describe("Scenario -- Check storage after allocate/deallocate/reallocate", () =>
     before(async () => {
         // load deployed contracts
         token = await ethers.getContractAt(
-            constants.STAKING_TOKEN_ABI[chainId],
+            constants.STAKING_TOKEN_ABI,
             constants.STAKING_TOKEN_ADDRESS[chainId]
         );
         validatorShare = await ethers.getContractAt(
-            constants.VALIDATOR_SHARE_ABI[chainId],
+            constants.VALIDATOR_SHARE_ABI,
             constants.VALIDATOR_SHARE_CONTRACT_ADDRESS[chainId]
         );
         stakeManager = await ethers.getContractAt(
-            constants.STAKE_MANAGER_ABI[chainId],
+            constants.STAKE_MANAGER_ABI,
             constants.STAKE_MANAGER_CONTRACT_ADDRESS[chainId]
         );
 
         // load signers, balances set to 10k ETH in hardhat config file
         [deployer, treasury, user1, user2] = await ethers.getSigners();
 
-        // load factories and deployer staker and whitelist
-        whitelist = await ethers
-            .getContractFactory("MasterWhitelist")
-            .then((whitelistFactory) =>
-                upgrades.deployProxy(whitelistFactory, [
-                    AddressZero, // _reader
-                    AddressZero, // _registry
-                    [], // _countryBlacklist
-                ])
-            );
+        // mock whitelist
+        whitelist = await smock.fake(constants.WHITELIST_ABI);
+
+        // add users to whitelist
+        whitelist.isUserWhitelisted.returns((params : [string]) => {
+          return [deployer, treasury, user1, user2].map(it => it.address).includes(params[0])
+        });
 
         staker = await ethers
             .getContractFactory("TruStakeMATICv2")
@@ -93,6 +90,9 @@ describe("Scenario -- Check storage after allocate/deallocate/reallocate", () =>
                 ])
             );
 
+        // make it the default validator
+        await staker.setDefaultValidator(validatorShare.address);
+
         // set each balance to 10k MATIC and approve it to staker
         await setTokenBalancesAndApprove(
             token,
@@ -101,11 +101,6 @@ describe("Scenario -- Check storage after allocate/deallocate/reallocate", () =>
             parseEther("1000000")
         );
 
-        // add users to whitelist
-        await whitelist.connect(deployer).addUserToWhitelist(deployer.address);
-        await whitelist.connect(deployer).addUserToWhitelist(treasury.address);
-        await whitelist.connect(deployer).addUserToWhitelist(user1.address);
-        await whitelist.connect(deployer).addUserToWhitelist(user2.address);
     });
 
     describe(`Flow`, async () => {

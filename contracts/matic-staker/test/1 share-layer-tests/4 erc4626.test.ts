@@ -15,11 +15,11 @@ import { advanceEpochs } from "../helpers/state-interaction";
 import { EPSILON } from "../helpers/constants";
 
 describe("ERC-4626 (TEMP)", () => {
-  let treasury, one, two, staker, token, stakeManager;
+  let treasury, one, two, staker, token, stakeManager, validatorShare;
   let TREASURY_INITIAL_DEPOSIT;
   beforeEach(async () => {
     // reset to fixture
-    ({ treasury, one, two, staker, token, stakeManager } = await loadFixture(deployment));
+    ({ treasury, one, two, staker, token, stakeManager, validatorShare } = await loadFixture(deployment));
     TREASURY_INITIAL_DEPOSIT = parseEther(100);
     await staker.connect(treasury).deposit(TREASURY_INITIAL_DEPOSIT, treasury.address);
   });
@@ -101,8 +101,8 @@ describe("ERC-4626 (TEMP)", () => {
       // Check user values
       expect(await staker.balanceOf(one.address)).to.equal(parseEther(7000));
 
-      let unbondNonce = await staker.getUnbondNonce();
-      let [user, amount] = await staker.unbondingWithdrawals(unbondNonce);
+      let unbondNonce = await staker.getUnbondNonce(validatorShare.address);
+      let [user, amount] = await staker.withdrawals(validatorShare.address, unbondNonce);
       expect(user).to.equal(one.address);
       expect(amount).to.equal(parseEther(3000));
     });
@@ -142,8 +142,8 @@ describe("ERC-4626 (TEMP)", () => {
       // Check user values
       expect(await staker.balanceOf(one.address)).to.equal(shares7000);
 
-      let unbondNonce = await staker.getUnbondNonce();
-      let [user, amount] = await staker.unbondingWithdrawals(unbondNonce);
+      let unbondNonce = await staker.getUnbondNonce(validatorShare.address);
+      let [user, amount] = await staker.withdrawals(validatorShare.address, unbondNonce);
       expect(user).to.equal(one.address);
       expect(amount).to.equal(shares3000);
     });
@@ -158,9 +158,9 @@ describe("ERC-4626 (TEMP)", () => {
       // get balance of user
       const userMaticBalanceBefore = await token.balanceOf(one.address);
       const userInfo = await staker.getUserInfo(one.address);
-      // REDEEM 
+      // REDEEM
       await staker.connect(one).redeem(balance, one.address, one.address);
-      const unbondNonce = await staker.getUnbondNonce();
+      const unbondNonce = await staker.getUnbondNonce(validatorShare.address);
 
       // Check vault values are as expected
       expect(await staker.totalStaked()).to.equal(TREASURY_INITIAL_DEPOSIT.sub(EPSILON));
@@ -183,9 +183,9 @@ describe("ERC-4626 (TEMP)", () => {
       expect(await staker.getCurrentEpoch()).to.equal(epoch.add(100));
 
       // try claiming with user one
-      await staker.connect(one).withdrawClaim(unbondNonce);
+      await staker.connect(one).withdrawClaim(unbondNonce, validatorShare.address);
 
-      // new matic balance of user in wallet should be: 
+      // new MATIC balance of user in wallet should be:
       expect(await token.balanceOf(one.address)).to.equal(userMaticBalanceBefore.add(userInfo[1]));
     });
 

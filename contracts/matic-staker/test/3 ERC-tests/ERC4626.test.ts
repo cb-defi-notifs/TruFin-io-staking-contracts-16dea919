@@ -2,6 +2,8 @@ import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
 import { expect } from "chai";
 import { deployment } from "../helpers/fixture";
 import { parseEther } from "../helpers/math";
+import { smock } from "@defi-wonderland/smock";
+import * as constants from "../helpers/constants";
 const { anyValue } = require("@nomicfoundation/hardhat-chai-matchers/withArgs");
 
 describe("ERC-4626", () => {
@@ -82,6 +84,45 @@ describe("ERC-4626", () => {
         .to.emit(staker, "Deposit")
         .withArgs(depositor.address, depositor.address, anyValue, SHARES);
     });
+  });
+
+
+  describe("mint from specific validator", () => {
+    it("should revert if receiver is not caller ", async () => {
+      // mock validator
+      const validator = await smock.fake(constants.VALIDATOR_SHARE_ABI);
+      await staker.connect(deployer).addValidator(validator.address);
+
+      await expect(staker.connect(depositor).mintFromSpecificValidator(DEPOSIT, receiver.address, validator.address)).to.be.revertedWithCustomError(
+        staker,
+        "SenderAndOwnerMustBeReceiver"
+      );
+    });
+
+    it("should mint fresh shares to depositor who deposited to specific validator", async () => {
+      // mock validator
+      const validator = await smock.fake(constants.VALIDATOR_SHARE_ABI);
+      await staker.connect(deployer).addValidator(validator.address);
+      await staker.connect(depositor).mintFromSpecificValidator(SHARES, depositor.address, validator.address);
+
+      // Check depositor owns minted shares
+      expect(await staker.balanceOf(depositor.address)).to.equal(SHARES);
+    });
+
+    it("Mint from specific validator", async () => {
+      // mock validator
+      const validator = await smock.fake(constants.VALIDATOR_SHARE_ABI);
+      await staker.connect(deployer).addValidator(validator.address);
+
+      // stake as user1
+      const amount = parseEther(1000);
+
+      const tx = await staker.connect(depositor).mintFromSpecificValidator(amount, depositor.address, validator.address);
+
+      await expect(tx).to.emit(staker, "Deposited").withArgs(depositor.address, anyValue, anyValue, anyValue, anyValue, anyValue, validator.address);
+      expect(await staker.balanceOf(depositor.address)).to.equal(amount);
+    });
+
   });
 
   describe("withdraw", () => {

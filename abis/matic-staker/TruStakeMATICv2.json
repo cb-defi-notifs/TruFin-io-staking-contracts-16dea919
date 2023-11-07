@@ -11,6 +11,11 @@
   },
   {
     "inputs": [],
+    "name": "AllocationToInitialRecipient",
+    "type": "error"
+  },
+  {
+    "inputs": [],
     "name": "AllocationUnderOneMATIC",
     "type": "error"
   },
@@ -21,12 +26,12 @@
   },
   {
     "inputs": [],
-    "name": "DepositSurpassesVaultCap",
+    "name": "DepositBelowMinDeposit",
     "type": "error"
   },
   {
     "inputs": [],
-    "name": "DepositUnderOneMATIC",
+    "name": "DepositSurpassesVaultCap",
     "type": "error"
   },
   {
@@ -56,7 +61,7 @@
   },
   {
     "inputs": [],
-    "name": "NoRewardsAllocatedToRecipient",
+    "name": "MinDepositTooSmall",
     "type": "error"
   },
   {
@@ -92,6 +97,31 @@
   {
     "inputs": [],
     "name": "UserNotWhitelisted",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "ValidatorAlreadyExists",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "ValidatorDoesNotExist",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "ValidatorNotDisabled",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "ValidatorNotEnabled",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "WithdrawClaimNonExistent",
     "type": "error"
   },
   {
@@ -313,6 +343,12 @@
         "internalType": "uint256",
         "name": "_totalAssets",
         "type": "uint256"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "_validator",
+        "type": "address"
       }
     ],
     "name": "Deposited",
@@ -547,6 +583,25 @@
     "inputs": [
       {
         "indexed": true,
+        "internalType": "address",
+        "name": "_oldDefaultValidator",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "_newDefaultValidator",
+        "type": "address"
+      }
+    ],
+    "name": "SetDefaultValidator",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
         "internalType": "uint256",
         "name": "_oldDistPhi",
         "type": "uint256"
@@ -578,6 +633,25 @@
       }
     ],
     "name": "SetEpsilon",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "_oldMinDeposit",
+        "type": "uint256"
+      },
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "_newMinDeposit",
+        "type": "uint256"
+      }
+    ],
+    "name": "SetMinDeposit",
     "type": "event"
   },
   {
@@ -624,25 +698,6 @@
       {
         "indexed": true,
         "internalType": "address",
-        "name": "_oldValidatorShareContract",
-        "type": "address"
-      },
-      {
-        "indexed": true,
-        "internalType": "address",
-        "name": "_newValidatorShareContract",
-        "type": "address"
-      }
-    ],
-    "name": "SetValidatorShareContract",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "address",
         "name": "_oldWhitelistAddress",
         "type": "address"
       },
@@ -674,7 +729,7 @@
       {
         "indexed": false,
         "internalType": "address",
-        "name": "_validatorShareContractAddress",
+        "name": "_validator",
         "type": "address"
       },
       {
@@ -742,6 +797,44 @@
       {
         "indexed": true,
         "internalType": "address",
+        "name": "_validator",
+        "type": "address"
+      }
+    ],
+    "name": "ValidatorAdded",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "_validator",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "enum ValidatorState",
+        "name": "_oldState",
+        "type": "uint8"
+      },
+      {
+        "indexed": true,
+        "internalType": "enum ValidatorState",
+        "name": "_newState",
+        "type": "uint8"
+      }
+    ],
+    "name": "ValidatorStateChanged",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
         "name": "sender",
         "type": "address"
       },
@@ -780,6 +873,12 @@
         "indexed": true,
         "internalType": "address",
         "name": "_user",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "_validator",
         "type": "address"
       },
       {
@@ -833,6 +932,12 @@
       },
       {
         "indexed": true,
+        "internalType": "address",
+        "name": "_validator",
+        "type": "address"
+      },
+      {
+        "indexed": false,
         "internalType": "uint256",
         "name": "_unbondNonce",
         "type": "uint256"
@@ -846,6 +951,19 @@
     ],
     "name": "WithdrawalRequested",
     "type": "event"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_validator",
+        "type": "address"
+      }
+    ],
+    "name": "addValidator",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
   {
     "inputs": [
@@ -1021,6 +1139,11 @@
         "internalType": "uint256[]",
         "name": "_unbondNonces",
         "type": "uint256[]"
+      },
+      {
+        "internalType": "address",
+        "name": "_validator",
+        "type": "address"
       }
     ],
     "name": "claimList",
@@ -1134,6 +1257,19 @@
     "type": "function"
   },
   {
+    "inputs": [],
+    "name": "defaultValidatorAddress",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
     "inputs": [
       {
         "internalType": "uint256",
@@ -1154,6 +1290,43 @@
         "type": "uint256"
       }
     ],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_assets",
+        "type": "uint256"
+      },
+      {
+        "internalType": "address",
+        "name": "_validator",
+        "type": "address"
+      }
+    ],
+    "name": "depositToSpecificValidator",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_validator",
+        "type": "address"
+      }
+    ],
+    "name": "disableValidator",
+    "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
   },
@@ -1181,6 +1354,11 @@
         "internalType": "bool",
         "name": "_strict",
         "type": "bool"
+      },
+      {
+        "internalType": "bool",
+        "name": "_inMatic",
+        "type": "bool"
       }
     ],
     "name": "distributeAll",
@@ -1203,6 +1381,11 @@
       {
         "internalType": "bool",
         "name": "_strict",
+        "type": "bool"
+      },
+      {
+        "internalType": "bool",
+        "name": "_inMatic",
         "type": "bool"
       }
     ],
@@ -1241,6 +1424,19 @@
     "type": "function"
   },
   {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_validator",
+        "type": "address"
+      }
+    ],
+    "name": "enableValidator",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
     "inputs": [],
     "name": "epsilon",
     "outputs": [
@@ -1248,6 +1444,36 @@
         "internalType": "uint256",
         "name": "",
         "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "getAllValidators",
+    "outputs": [
+      {
+        "components": [
+          {
+            "internalType": "enum ValidatorState",
+            "name": "state",
+            "type": "uint8"
+          },
+          {
+            "internalType": "uint256",
+            "name": "stakedAmount",
+            "type": "uint256"
+          },
+          {
+            "internalType": "address",
+            "name": "validatorAddress",
+            "type": "address"
+          }
+        ],
+        "internalType": "struct Validator[]",
+        "name": "",
+        "type": "tuple[]"
       }
     ],
     "stateMutability": "view",
@@ -1328,7 +1554,32 @@
     "type": "function"
   },
   {
-    "inputs": [],
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_validator",
+        "type": "address"
+      }
+    ],
+    "name": "getRewardsFromValidator",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_validator",
+        "type": "address"
+      }
+    ],
     "name": "getUnbondNonce",
     "outputs": [
       {
@@ -1380,6 +1631,19 @@
     "type": "function"
   },
   {
+    "inputs": [],
+    "name": "getValidators",
+    "outputs": [
+      {
+        "internalType": "address[]",
+        "name": "",
+        "type": "address[]"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
     "inputs": [
       {
         "internalType": "address",
@@ -1417,7 +1681,7 @@
       },
       {
         "internalType": "address",
-        "name": "_validatorShareContractAddress",
+        "name": "_validator",
         "type": "address"
       },
       {
@@ -1457,6 +1721,11 @@
         "internalType": "uint256",
         "name": "_unbondNonce",
         "type": "uint256"
+      },
+      {
+        "internalType": "address",
+        "name": "_validator",
+        "type": "address"
       }
     ],
     "name": "isClaimable",
@@ -1547,6 +1816,19 @@
     "type": "function"
   },
   {
+    "inputs": [],
+    "name": "minDeposit",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
     "inputs": [
       {
         "internalType": "uint256",
@@ -1560,6 +1842,35 @@
       }
     ],
     "name": "mint",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_shares",
+        "type": "uint256"
+      },
+      {
+        "internalType": "address",
+        "name": "_receiver",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "_validator",
+        "type": "address"
+      }
+    ],
+    "name": "mintFromSpecificValidator",
     "outputs": [
       {
         "internalType": "uint256",
@@ -1797,6 +2108,19 @@
   {
     "inputs": [
       {
+        "internalType": "address",
+        "name": "_validator",
+        "type": "address"
+      }
+    ],
+    "name": "setDefaultValidator",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
         "internalType": "uint256",
         "name": "_distPhi",
         "type": "uint256"
@@ -1824,6 +2148,19 @@
     "inputs": [
       {
         "internalType": "uint256",
+        "name": "_newMinDeposit",
+        "type": "uint256"
+      }
+    ],
+    "name": "setMinDeposit",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
         "name": "_phi",
         "type": "uint256"
       }
@@ -1842,19 +2179,6 @@
       }
     ],
     "name": "setTreasury",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "_validatorShareContractAddress",
-        "type": "address"
-      }
-    ],
-    "name": "setValidatorShareContract",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -1891,7 +2215,13 @@
     "type": "function"
   },
   {
-    "inputs": [],
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_validator",
+        "type": "address"
+      }
+    ],
     "name": "stakeClaimedRewards",
     "outputs": [],
     "stateMutability": "nonpayable",
@@ -1989,7 +2319,7 @@
     "outputs": [
       {
         "internalType": "uint256",
-        "name": "",
+        "name": "validatorRewards",
         "type": "uint256"
       }
     ],
@@ -2002,7 +2332,7 @@
     "outputs": [
       {
         "internalType": "uint256",
-        "name": "",
+        "name": "stake",
         "type": "uint256"
       }
     ],
@@ -2126,12 +2456,47 @@
     "type": "function"
   },
   {
-    "inputs": [],
-    "name": "validatorShareContractAddress",
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "name": "validatorAddresses",
     "outputs": [
       {
         "internalType": "address",
         "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "name": "validators",
+    "outputs": [
+      {
+        "internalType": "enum ValidatorState",
+        "name": "state",
+        "type": "uint8"
+      },
+      {
+        "internalType": "uint256",
+        "name": "stakedAmount",
+        "type": "uint256"
+      },
+      {
+        "internalType": "address",
+        "name": "validatorAddress",
         "type": "address"
       }
     ],
@@ -2186,11 +2551,69 @@
         "internalType": "uint256",
         "name": "_unbondNonce",
         "type": "uint256"
+      },
+      {
+        "internalType": "address",
+        "name": "_validator",
+        "type": "address"
       }
     ],
     "name": "withdrawClaim",
     "outputs": [],
     "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_assets",
+        "type": "uint256"
+      },
+      {
+        "internalType": "address",
+        "name": "_validator",
+        "type": "address"
+      }
+    ],
+    "name": "withdrawFromSpecificValidator",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      },
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "name": "withdrawals",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "user",
+        "type": "address"
+      },
+      {
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
     "type": "function"
   }
 ]

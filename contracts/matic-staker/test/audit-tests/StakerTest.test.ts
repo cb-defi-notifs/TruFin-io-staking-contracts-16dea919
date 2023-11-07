@@ -1,16 +1,13 @@
 import { expect } from "chai";
 import { ethers, upgrades } from "hardhat";
-import { BigNumber, Contract } from "ethers";
+import { smock } from '@defi-wonderland/smock';
 import { AddressZero } from "@ethersproject/constants";
 import * as helpers from "@nomicfoundation/hardhat-network-helpers";
 import * as constants from "../helpers/constants";
 
-const chainId = 1;
+const chainId = constants.DEFAULT_CHAIN_ID;
 
 const parseEther = ethers.utils.parseEther;
-const formatEther = ethers.utils.formatEther;
-const toBN = ethers.BigNumber.from;
-const ZERO_ADDRESS = ethers.constants.AddressZero;
 
 // needed because solidity div always rounds down
 const expectDivEqual = (a: any, b: any) => expect(a - b).to.be.oneOf([0, 1]);
@@ -45,38 +42,35 @@ const setTokenBalancesAndApprove = async (token, users, recipient, amount) => {
 };
 
 describe("Staker", () => {
-  let deployer, treasury, user1, user2;
+  let deployer, treasury, user1, user2, user3;
   let token, validatorShare, stakeManager, whitelist, staker;
   let snapshot: any;
 
   before(async () => {
     // load deployed contracts
     token = await ethers.getContractAt(
-      constants.STAKING_TOKEN_ABI[chainId],
+      constants.STAKING_TOKEN_ABI,
       constants.STAKING_TOKEN_ADDRESS[chainId]
     );
     validatorShare = await ethers.getContractAt(
-      constants.VALIDATOR_SHARE_ABI[chainId],
+      constants.VALIDATOR_SHARE_ABI,
       constants.VALIDATOR_SHARE_CONTRACT_ADDRESS[chainId]
     );
     stakeManager = await ethers.getContractAt(
-      constants.STAKE_MANAGER_ABI[chainId],
+      constants.STAKE_MANAGER_ABI,
       constants.STAKE_MANAGER_CONTRACT_ADDRESS[chainId]
     );
 
     // load signers, balances set to 10k ETH in hardhat config file
-    [deployer, treasury, user1, user2] = await ethers.getSigners();
+    [deployer, treasury, user1, user2, user3] = await ethers.getSigners();
 
-    // load factories and deployer staker and whitelist
-    whitelist = await ethers
-      .getContractFactory("MasterWhitelist")
-      .then((whitelistFactory) =>
-        upgrades.deployProxy(whitelistFactory, [
-          AddressZero, // _reader
-          AddressZero, // _registry
-          [], // _countryBlacklist
-        ])
-      );
+    // mock whitelist
+    whitelist = await smock.fake(constants.WHITELIST_ABI);
+
+    // add users to whitelist
+    whitelist.isUserWhitelisted.returns((params : [string]) => {
+      return [deployer, treasury, user1, user2].map(it => it.address).includes(params[0])
+    });
 
     staker = await ethers
       .getContractFactory("TruStakeMATICv2")
@@ -93,6 +87,9 @@ describe("Staker", () => {
         ])
       );
 
+    // make it the default validator
+    await staker.setDefaultValidator(validatorShare.address);
+
     // set each balance to 10k MATIC and approve it to staker
     await setTokenBalancesAndApprove(
       token,
@@ -100,12 +97,6 @@ describe("Staker", () => {
       staker.address,
       parseEther("1000000")
     );
-
-    // add users to whitelist
-    await whitelist.connect(deployer).addUserToWhitelist(deployer.address);
-    await whitelist.connect(deployer).addUserToWhitelist(treasury.address);
-    await whitelist.connect(deployer).addUserToWhitelist(user1.address);
-    await whitelist.connect(deployer).addUserToWhitelist(user2.address);
 
     // treasury deposits first
     await staker.connect(treasury).deposit(parseEther("100"), treasury.address);
@@ -120,17 +111,6 @@ describe("Staker", () => {
   });
 
   describe(`Setters`, async () => {
-
-    it(`Set validator share contract`, async () => {
-      const tx = await staker.setValidatorShareContract(deployer.address);
-
-      await expect(tx)
-        .to.emit(staker, "SetValidatorShareContract")
-        .withArgs(validatorShare.address, deployer.address);
-      expect(await staker.validatorShareContractAddress()).to.equal(
-        deployer.address
-      );
-    });
 
     it(`Set whitelist`, async () => {
       const tx = await staker.setWhitelist(deployer.address);
@@ -236,7 +216,7 @@ describe("Staker", () => {
         .allocate(parseEther("1000"), user2.address, false);
 
       await expect(tx).to.emit(staker, "Allocated");
-      
+
       const userAlloc = await staker.allocations(user1.address, user2.address, false);
       const sharePrice = userAlloc.sharePriceNum/userAlloc.sharePriceDenom;
       expect(userAlloc.maticAmount).to.equal(amount);
@@ -315,7 +295,7 @@ describe("Staker", () => {
 
       await staker
         .connect(user1)
-        .distributeRewards(user2.address, user1.address, false);
+        .distributeRewards(user2.address, user1.address, false, false);
 
       const user2BalanceAfter = await staker.balanceOf(user2.address);
 
@@ -340,9 +320,9 @@ describe("Staker", () => {
       ).to.be.revertedWith("Initializable: contract is already initialized");
     });
 
-    it(`When not owner tries to set validator share contract`, async () => {
+    it(`When not owner tries to add a validator`, async () => {
       await expect(
-        staker.connect(user1).setValidatorShareContract(user1.address)
+        staker.connect(user1).addValidator(user1.address)
       ).to.be.revertedWith("Ownable: caller is not the owner");
     });
 
@@ -389,26 +369,20 @@ describe("Staker", () => {
     });
 
     it(`When not whitelisted user tries to allocate`, async () => {
-      await whitelist.removeUserFromWhitelist(user1.address);
-
       await expect(
-        staker.connect(user1).allocate(1, deployer.address, false)
+        staker.connect(user3).allocate(1, deployer.address, false)
       ).to.be.revertedWithCustomError(staker, "UserNotWhitelisted");
     });
 
     it(`When not whitelisted user tries to deallocate`, async () => {
-      await whitelist.removeUserFromWhitelist(user1.address);
-
       await expect(
-        staker.connect(user1).deallocate(1, deployer.address, false)
+        staker.connect(user3).deallocate(1, deployer.address, false)
       ).to.be.revertedWithCustomError(staker, "UserNotWhitelisted");
     });
 
     it(`When not whitelisted user tries to reallocate`, async () => {
-      await whitelist.removeUserFromWhitelist(user1.address);
-
       await expect(
-        staker.connect(user1).reallocate(user1.address, deployer.address)
+        staker.connect(user3).reallocate(user1.address, deployer.address)
       ).to.be.revertedWithCustomError(staker, "UserNotWhitelisted");
     });
 
@@ -421,7 +395,7 @@ describe("Staker", () => {
     it(`When try to deallocate`, async () => {
       await expect(
         staker.deallocate(1, deployer.address, false)
-      ).to.be.revertedWithCustomError(staker, "NoRewardsAllocatedToRecipient");
+      ).to.be.revertedWithCustomError(staker, "AllocationNonExistent");
     });
 
     it(`When try to reallocate if allocation not exists`, async () => {
@@ -431,34 +405,26 @@ describe("Staker", () => {
     });
 
     it(`When not whitelisted user tries to deposit`, async () => {
-      await whitelist.removeUserFromWhitelist(user1.address);
-
       await expect(
-          staker.connect(user1).deposit(1, user1.address)
+          staker.connect(user3).deposit(1, user1.address)
       ).to.be.revertedWithCustomError(staker, "UserNotWhitelisted");
     });
 
     it(`When not whitelisted user tries to mint`, async () => {
-      await whitelist.removeUserFromWhitelist(user1.address);
-
       await expect(
-          staker.connect(user1).mint(1, deployer.address)
+          staker.connect(user3).mint(1, deployer.address)
       ).to.be.revertedWithCustomError(staker, "UserNotWhitelisted");
     });
 
     it(`When not whitelisted user tries to withdraw`, async () => {
-      await whitelist.removeUserFromWhitelist(user1.address);
-
       await expect(
-          staker.connect(user1).withdraw(1, user1.address, deployer.address)
+          staker.connect(user3).withdraw(1, user1.address, deployer.address)
       ).to.be.revertedWithCustomError(staker, "UserNotWhitelisted");
     });
 
     it(`When not whitelisted user tries to redeem`, async () => {
-      await whitelist.removeUserFromWhitelist(user1.address);
-
       await expect(
-          staker.connect(user1).redeem(1, user1.address, deployer.address)
+          staker.connect(user3).redeem(1, user1.address, deployer.address)
       ).to.be.revertedWithCustomError(staker, "UserNotWhitelisted");
     });
   });

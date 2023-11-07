@@ -9,7 +9,7 @@ import { EPSILON } from "../helpers/constants";
 
 describe("DISTRIBUTION", () => {
   // Accounts
-  let deployer, treasury, allocatorOne, recipientOne, recipientTwo, depositor, staker, stakeManager;
+  let deployer, treasury, allocatorOne, recipientOne, recipientTwo, depositor, staker, stakeManager, token;
 
   // Test constants
   const ALLOCATED_AMOUNT = parseEther(10000);
@@ -24,7 +24,8 @@ describe("DISTRIBUTION", () => {
       deployer,
       treasury,
       staker,
-      stakeManager
+      stakeManager,
+      token
     } = await loadFixture(deployment));
 
     // Deposit to staker as allocatorOne
@@ -43,7 +44,7 @@ describe("DISTRIBUTION", () => {
 
       it("Reverts if target allocation is loose and caller is not the allocator", async () => {
         await expect(
-          staker.connect(recipientOne).distributeRewards(recipientOne.address, allocatorOne.address, false)
+          staker.connect(recipientOne).distributeRewards(recipientOne.address, allocatorOne.address, false, false)
         ).to.be.revertedWithCustomError(staker, "OnlyDistributorCanDistributeRewards");
       });
 
@@ -56,7 +57,7 @@ describe("DISTRIBUTION", () => {
 
         await submitCheckpoint(1);
 
-        await expect(staker.connect(recipientTwo).distributeRewards(recipientOne.address, allocatorOne.address, true))
+        await expect(staker.connect(recipientTwo).distributeRewards(recipientOne.address, allocatorOne.address, true, false))
           .to.not.be.reverted;
       });
     });
@@ -75,7 +76,7 @@ describe("DISTRIBUTION", () => {
 
       it("Reverts if target allocations are loose and caller is not the allocator", async () => {
         await expect(
-          staker.connect(recipientOne).distributeAll(allocatorOne.address, false)
+          staker.connect(recipientOne).distributeAll(allocatorOne.address, false, false)
         ).to.be.revertedWithCustomError(staker, "OnlyDistributorCanDistributeRewards");
       });
 
@@ -88,7 +89,7 @@ describe("DISTRIBUTION", () => {
 
         await submitCheckpoint(1);
 
-        await expect(staker.connect(recipientOne).distributeAll(allocatorOne.address, true)).to.not.be.reverted;
+        await expect(staker.connect(recipientOne).distributeAll(allocatorOne.address, true, false)).to.not.be.reverted;
       });
 
       it("Calls _distributeRewards for all allocator's recipients", async () => {
@@ -96,7 +97,7 @@ describe("DISTRIBUTION", () => {
         expect(await staker.balanceOf(recipientOne.address)).to.equal(0);
         expect(await staker.balanceOf(recipientTwo.address)).to.equal(0);
 
-        await staker.connect(allocatorOne).distributeAll(allocatorOne.address, false);
+        await staker.connect(allocatorOne).distributeAll(allocatorOne.address, false, false);
 
         // Check TruMATIC rewards have been sent all recipients => indicates _distributedRewards has been called for each
         expect(await staker.balanceOf(recipientOne.address)).to.be.gt(0);
@@ -107,7 +108,7 @@ describe("DISTRIBUTION", () => {
         // Save share price at distribution time
         const [globalSharePriceNumerator, globalSharePriceDenominator] = await staker.sharePrice();
 
-        await staker.connect(allocatorOne).distributeAll(allocatorOne.address, false);
+        await staker.connect(allocatorOne).distributeAll(allocatorOne.address, false, false);
 
         const { sharePriceNum, sharePriceDenom } = await staker.totalAllocated(allocatorOne.address, false);
 
@@ -168,7 +169,7 @@ describe("DISTRIBUTION", () => {
       it("Emits 'DistributedRewards' with correct parameters inside distributeAll call", async () => {
         // Distribute recipientOne's rewards via a distributeAll call
         // This sets _individual parameter to false in subsequent internal _distributeRewards call => leads to event emission
-        await expect(staker.connect(allocatorOne).distributeAll(allocatorOne.address, false))
+        await expect(staker.connect(allocatorOne).distributeAll(allocatorOne.address, false, false))
           .to.emit(staker, "DistributedRewards")
           .withArgs(
             allocatorOne.address,
@@ -185,18 +186,18 @@ describe("DISTRIBUTION", () => {
 
       it("Transfers rewards as TruMATIC to recipient", async () => {
         await expect(
-          staker.connect(allocatorOne).distributeRewards(recipientOne.address, allocatorOne.address, false)
+          staker.connect(allocatorOne).distributeRewards(recipientOne.address, allocatorOne.address, false, false)
         ).to.changeTokenBalance(staker, recipientOne, recipientOneTruMATICRewards);
       });
 
       it("Transfers TruMATIC recipientOneTruMATICFee to treasury", async () => {
         await expect(
-          staker.connect(allocatorOne).distributeRewards(recipientOne.address, allocatorOne.address, false)
+          staker.connect(allocatorOne).distributeRewards(recipientOne.address, allocatorOne.address, false, false)
         ).to.changeTokenBalance(staker, treasury, recipientOneTruMATICFee);
       });
 
       it("Updates individual price allocation", async () => {
-        await staker.connect(allocatorOne).distributeRewards(recipientOne.address, allocatorOne.address, false);
+        await staker.connect(allocatorOne).distributeRewards(recipientOne.address, allocatorOne.address, false, false);
 
         const {
           sharePriceNum: individualAllocationSharePriceNumerator,
@@ -237,7 +238,7 @@ describe("DISTRIBUTION", () => {
         // Check max redemption is zero => less that recipientOne's rewards
         expect(await staker.maxRedeem(allocatorOne.address)).to.equal(0);
 
-        await staker.connect(allocatorOne).distributeRewards(recipientOne.address, allocatorOne.address, true);
+        await staker.connect(allocatorOne).distributeRewards(recipientOne.address, allocatorOne.address, true, false);
 
         const recipientOneBalanceAfter = await staker.balanceOf(recipientOne.address);
 
@@ -252,13 +253,13 @@ describe("DISTRIBUTION", () => {
       beforeEach(async () => {
         distributeRewardsTransaction = await staker
           .connect(allocatorOne)
-          .distributeRewards(recipientOne.address, allocatorOne.address, false);
+          .distributeRewards(recipientOne.address, allocatorOne.address, false, false);
       });
 
       it("Reverts if no allocation made by distributor to input recipient", async () => {
         // AllocatorOne has not allocated to themselves
         await expect(
-          staker.connect(allocatorOne).distributeRewards(allocatorOne.address, allocatorOne.address, false)
+          staker.connect(allocatorOne).distributeRewards(allocatorOne.address, allocatorOne.address, false, false)
         ).to.be.revertedWithCustomError(staker, "NothingToDistribute");
       });
 
@@ -266,7 +267,7 @@ describe("DISTRIBUTION", () => {
         // distributeRewardsTransaction sets the share price of recipientOne's allocation to the global share price
         const nonDistributingTransaction = await staker
           .connect(allocatorOne)
-          .distributeRewards(recipientOne.address, allocatorOne.address, false);
+          .distributeRewards(recipientOne.address, allocatorOne.address, false, false);
 
         // Skipping of distribution during repeat call can be checked via event emission
         await expect(nonDistributingTransaction).to.not.emit(staker, "DistributedRewards");
@@ -311,7 +312,7 @@ describe("DISTRIBUTION", () => {
         const intendedSharePriceDenominator = one.add(two).sub(three);
 
         // Distribute recipientOne's rewards
-        await staker.connect(allocatorOne).distributeRewards(recipientOne.address, allocatorOne.address, false);
+        await staker.connect(allocatorOne).distributeRewards(recipientOne.address, allocatorOne.address, false, false);
 
         // Get updated total allocation share price
         const { sharePriceDenom } = await staker.totalAllocated(allocatorOne.address, false);
@@ -357,7 +358,7 @@ describe("DISTRIBUTION", () => {
       await staker.connect(deployer).setDistPhi(0);
 
       // Distribute rewards to recipientOne
-      await staker.connect(allocatorOne).distributeRewards(recipientOne.address, allocatorOne.address, false);
+      await staker.connect(allocatorOne).distributeRewards(recipientOne.address, allocatorOne.address, false, false);
 
       // TruMATIC balances post-distribution
       const recipientOneBalance = await staker.balanceOf(recipientOne.address);
@@ -380,8 +381,8 @@ describe("DISTRIBUTION", () => {
       await submitCheckpoint(0);
 
       // Distribute rewards to recipientOne
-      await staker.connect(allocatorOne).distributeRewards(recipientOne.address, allocatorOne.address, false);
-      
+      await staker.connect(allocatorOne).distributeRewards(recipientOne.address, allocatorOne.address, false, false);
+
       // expected user balance after distribution of awards (incl +/- 1 wei rounding)
       const userInfoBefore = await staker.getUserInfo(allocatorOne.address);
       expect(userInfoBefore[1]).to.be.closeTo(ALLOCATED_AMOUNT.add(EPSILON), 1e0);
@@ -407,7 +408,7 @@ describe("DISTRIBUTION", () => {
       await submitCheckpoint(0);
 
       // Distribute rewards to recipientOne
-      await staker.connect(allocatorOne).distributeAll(allocatorOne.address, false);
+      await staker.connect(allocatorOne).distributeAll(allocatorOne.address, false, false);
 
       const totalAllocation = ALLOCATED_AMOUNT.mul(2);
 
@@ -417,7 +418,7 @@ describe("DISTRIBUTION", () => {
       staker.connect(allocatorOne).withdraw(totalAllocation, allocatorOne.address, allocatorOne.address);
     });
 
-    it("Mutliple distributeRewards calls are equivalent to single distributeAll call", async () => {
+    it("Multiple distributeRewards calls are equivalent to single distributeAll call", async () => {
       // Deposit ALLOCATED_AMOUNT MATIC again
       await staker.connect(allocatorOne).deposit(ALLOCATED_AMOUNT, allocatorOne.address);
 
@@ -428,7 +429,7 @@ describe("DISTRIBUTION", () => {
       await submitCheckpoint(0);
 
       // Distribute rewards for all allocatorOne's allocations
-      await staker.connect(allocatorOne).distributeAll(allocatorOne.address, false);
+      await staker.connect(allocatorOne).distributeAll(allocatorOne.address, false, false);
 
       // Save recipientOne's and recipientTwo's TruMATIC balances post-distribution
       const recipientOneBalanceDistributeAll = await staker.balanceOf(recipientOne.address);
@@ -456,8 +457,8 @@ describe("DISTRIBUTION", () => {
       await submitCheckpoint(0);
 
       // Perform individual distributeRewards calls
-      await staker.connect(allocatorOne).distributeRewards(recipientOne.address, allocatorOne.address, false);
-      await staker.connect(allocatorOne).distributeRewards(recipientTwo.address, allocatorOne.address, false);
+      await staker.connect(allocatorOne).distributeRewards(recipientOne.address, allocatorOne.address, false, false);
+      await staker.connect(allocatorOne).distributeRewards(recipientTwo.address, allocatorOne.address, false, false);
 
       // Get their TruMATIC balances post-distribution
       const recipientOneBalanceDistributeRewards = await staker.balanceOf(recipientOne.address);
@@ -472,12 +473,13 @@ describe("DISTRIBUTION", () => {
   describe("STRICT", async () => {
 
     const strictness = true;
+    const distributionInMATIC = false;
 
     beforeEach(async () => {
       await staker.connect(deployer).setAllowStrict(strictness);
       // Allocate that deposit to recipientOne as allocatorOne
       await staker.connect(allocatorOne).allocate(ALLOCATED_AMOUNT, recipientOne.address, strictness);
-    
+
     });
 
     it("Rewards earned via strict allocation equal rewards earned via deposit", async () => {
@@ -492,7 +494,7 @@ describe("DISTRIBUTION", () => {
       await staker.connect(deployer).setDistPhi(0);
 
       // Distribute rewards to recipientOne
-      await staker.connect(allocatorOne).distributeRewards(recipientOne.address, allocatorOne.address, strictness);
+      await staker.connect(allocatorOne).distributeRewards(recipientOne.address, allocatorOne.address, strictness, distributionInMATIC);
 
       // TruMATIC balances post-distribution
       const recipientOneBalance = await staker.balanceOf(recipientOne.address);
@@ -513,7 +515,7 @@ describe("DISTRIBUTION", () => {
       await submitCheckpoint(0);
 
       // Distribute rewards to recipientOne
-      await staker.connect(allocatorOne).distributeRewards(recipientOne.address, allocatorOne.address, strictness);
+      await staker.connect(allocatorOne).distributeRewards(recipientOne.address, allocatorOne.address, strictness, distributionInMATIC);
 
       // Ensure allocator cannot still claim their base allocation after distributing rewards to a single recipient
       await expect(staker.connect(allocatorOne).withdraw(ALLOCATED_AMOUNT, allocatorOne.address, allocatorOne.address)).to.be.revertedWithCustomError(staker, 'WithdrawalAmountTooLarge');
@@ -527,7 +529,7 @@ describe("DISTRIBUTION", () => {
 
       // Make a second allocation
       await staker.connect(allocatorOne).allocate(ALLOCATED_AMOUNT, recipientTwo.address, strictness);
-      
+
       // Accrue vault rewards
       await submitCheckpoint(0);
 
@@ -543,12 +545,12 @@ describe("DISTRIBUTION", () => {
 
       // Make a second allocation
       await staker.connect(allocatorOne).allocate(ALLOCATED_AMOUNT, recipientTwo.address, strictness);
-      
+
       // Accrue vault rewards
       await submitCheckpoint(0);
 
       // Distribute rewards to recipientOne
-      await staker.connect(allocatorOne).distributeAll(allocatorOne.address, strictness);
+      await staker.connect(allocatorOne).distributeAll(allocatorOne.address, strictness, distributionInMATIC);
 
       const totalAllocation = ALLOCATED_AMOUNT.mul(2);
 
@@ -568,7 +570,7 @@ describe("DISTRIBUTION", () => {
       await submitCheckpoint(0);
 
       // Distribute rewards for all allocatorOne's allocations
-      await staker.connect(allocatorOne).distributeAll(allocatorOne.address, strictness);
+      await staker.connect(allocatorOne).distributeAll(allocatorOne.address, strictness, distributionInMATIC);
 
       // Save recipientOne's and recipientTwo's TruMATIC balances post-distribution
       const recipientOneBalanceDistributeAll = await staker.balanceOf(recipientOne.address);
@@ -597,8 +599,8 @@ describe("DISTRIBUTION", () => {
       await submitCheckpoint(0);
 
       // Perform individual distributeRewards calls
-      await staker.connect(allocatorOne).distributeRewards(recipientOne.address, allocatorOne.address, strictness);
-      await staker.connect(allocatorOne).distributeRewards(recipientTwo.address, allocatorOne.address, strictness);
+      await staker.connect(allocatorOne).distributeRewards(recipientOne.address, allocatorOne.address, strictness, distributionInMATIC);
+      await staker.connect(allocatorOne).distributeRewards(recipientTwo.address, allocatorOne.address, strictness, distributionInMATIC);
 
       // Get their TruMATIC balances post-distribution
       const recipientOneBalanceDistributeRewards = await staker.balanceOf(recipientOne.address);
@@ -609,4 +611,114 @@ describe("DISTRIBUTION", () => {
       expect(recipientTwoBalanceDistributeAll).to.equal(recipientTwoBalanceDistributeRewards);
     });
   });
-});
+
+    describe("distribute MATIC rewards", async () => {
+      describe("distributeRewards", async () => {
+        it("Reverts if non-distributor tries to distribute MATIC", async () => {
+          await expect(
+            staker.connect(recipientOne).distributeRewards(recipientOne.address, allocatorOne.address, true, true)
+          ).to.be.revertedWithCustomError(staker, "OnlyDistributorCanDistributeRewards");
+        });
+
+        it("Reverts if distributor does not have enough MATIC", async () => {
+          // transfer all of allocator's MATIC balance
+          let matic_balance = await token.balanceOf(allocatorOne.address);
+          await token.connect(allocatorOne).transfer(depositor.address, matic_balance);
+
+          // with a MATIC balance of 0, distributing MATIC should fail
+          await submitCheckpoint(0);
+
+          await expect(
+            staker.connect(allocatorOne).distributeRewards(recipientOne.address, allocatorOne.address, false, true)
+          ).to.be.revertedWith("SafeERC20: low-level call failed");
+        });
+
+        it("No TruMATIC is transferred to recipients when distributing MATIC", async () => {
+          await submitCheckpoint(0);
+          await staker.connect(allocatorOne).distributeRewards(recipientOne.address, allocatorOne.address, false, true);
+          expect(await staker.balanceOf(recipientOne.address)).to.equal(0); // recipients balance should still be 0
+        });
+
+        it("The equivalent amount of TruMATIC is transferred to the user when distributing MATIC", async () => {
+          // allocate to new user
+          await staker.connect(allocatorOne).deposit(ALLOCATED_AMOUNT, allocatorOne.address);
+          await staker.connect(allocatorOne).allocate(ALLOCATED_AMOUNT, recipientTwo.address, false);
+
+          // accrue rewards
+          await submitCheckpoint(0);
+          await submitCheckpoint(1);
+
+          // distribute rewards in truMatic to user2 and check how many rewards were distributed
+          await staker.connect(allocatorOne).distributeRewards(recipientTwo.address, allocatorOne.address, false, false);
+          let truMaticAmount = await staker.balanceOf(recipientTwo.address);
+
+          // when distributing to user1 in MATIC, they should receive the equivalent amount as User2
+          let maticAmount =  await staker.previewRedeem(truMaticAmount);
+          await expect(
+            staker.connect(allocatorOne).distributeRewards(recipientOne.address, allocatorOne.address, false, true)
+          ).to.changeTokenBalance(token, recipientOne, maticAmount);
+
+          // total staked should remain the same
+          expect(await staker.totalStaked()).to.equal(ALLOCATED_AMOUNT.add(ALLOCATED_AMOUNT))
+        });
+      });
+
+      describe("distributeAll", async () => {
+        it("Reverts if non-distributor tries to distribute MATIC", async () => {
+          await expect(
+            staker.connect(recipientOne).distributeAll(allocatorOne.address, true, true)
+          ).to.be.revertedWithCustomError(staker, "OnlyDistributorCanDistributeRewards");
+        });
+
+        it("Reverts if distributor does not have enough MATIC", async () => {
+          // transfer all of allocator's MATIC balance
+          let matic_balance = await token.balanceOf(allocatorOne.address);
+          await token.connect(allocatorOne).transfer(depositor.address, matic_balance);
+
+          // with a MATIC balance of 0, distributing MATIC should fail
+          await submitCheckpoint(0);
+
+          await expect(
+            staker.connect(allocatorOne).distributeAll(allocatorOne.address, false, true)
+          ).to.be.revertedWith("SafeERC20: low-level call failed");
+        });
+
+        it("No TruMATIC is transferred to recipients when distributing MATIC", async () => {
+          await submitCheckpoint(0);
+          await staker.connect(allocatorOne).distributeAll(allocatorOne.address, false, true);
+          expect(await staker.balanceOf(recipientOne.address)).to.equal(0); // recipients balance should still be 0
+
+        });
+
+        it("The equivalent amount of TruMATIC is transferred to the user when distributing MATIC", async () => {
+          // allocate to two new users
+          await staker.connect(allocatorOne).deposit(ALLOCATED_AMOUNT, allocatorOne.address);
+          await staker.connect(allocatorOne).allocate(ALLOCATED_AMOUNT, recipientTwo.address, false);
+          await staker.connect(allocatorOne).allocate(ALLOCATED_AMOUNT, depositor.address, false);
+
+          // accrue rewards
+          await submitCheckpoint(0);
+          await submitCheckpoint(1);
+
+          // distribute rewards in truMatic to depositor and check how many rewards were distributed
+          await staker.connect(allocatorOne).distributeRewards(depositor.address, allocatorOne.address, false, false);
+          let truMaticAmount = await staker.balanceOf(depositor.address);
+
+          // check pre-distribution MATIC balances of the two recipients
+          let preBalanceOne = await token.balanceOf(recipientOne.address);
+          let preBalanceTwo = await token.balanceOf(recipientTwo.address);
+
+          // distribute all
+          await staker.connect(allocatorOne).distributeAll(allocatorOne.address, false, true);
+
+          // expect recipients balance to have increased be the equivalent MATIC amount
+          let maticAmount =  await staker.previewRedeem(truMaticAmount);
+          expect(await token.balanceOf(recipientOne.address)).to.equal(preBalanceOne.add(maticAmount));
+          expect(await token.balanceOf(recipientTwo.address)).to.equal(preBalanceTwo.add(maticAmount));
+
+          // total staked should remain the same
+          expect(await staker.totalStaked()).to.equal(ALLOCATED_AMOUNT.add(ALLOCATED_AMOUNT))
+        });
+      });
+    });
+  });

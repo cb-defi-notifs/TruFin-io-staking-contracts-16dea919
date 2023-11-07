@@ -1,4 +1,4 @@
-/** Testing general and ERC-4626 implementation getters. 
+/** Testing general and ERC-4626 implementation getters.
  * Written originally by TG.
  * Reformatted by PD.
  */
@@ -13,16 +13,16 @@ import {
 import { submitCheckpoint } from "../helpers/state-interaction";
 
 describe("GETTERS", () => {
-  let one, two, staker, stakeManager;
+  let one, two, staker, validatorShare;
 
   beforeEach(async () => {
     // reset to fixture
-    ({ one, two, staker, stakeManager } = await loadFixture(deployment));
+    ({ one, two, staker, validatorShare } = await loadFixture(deployment));
   });
 
   describe("ERC-4626: max functions", async () => {
     // todo: add tests for input validation
-    
+
     it("maxDeposit", async () => {
       const cap = await staker.cap();
 
@@ -61,31 +61,31 @@ describe("GETTERS", () => {
 
     it("maxWithdraw", async () => {
       // no deposits
-  
+
       const balanceOld = await staker.balanceOf(one.address);
       const sharePriceOld = await staker.sharePrice();
       const maxWithdrawCalculatedOld = calculateAmountFromShares(balanceOld, sharePriceOld);
-      
+
       expect(await staker.maxWithdraw(one.address)).to.equal(0);
-      
+
       // deposit 1M MATIC
       await staker.connect(one).deposit(parseEther(1e6), one.address);
-      
+
       const balanceNew = await staker.balanceOf(one.address);
       const sharePriceNew = await staker.sharePrice();
       const maxWithdrawCalculatedNew = calculateAmountFromShares(balanceNew, sharePriceNew);
-  
+
       const maxWithdrawStaker = await staker.connect(one).maxWithdraw(one.address);
       const epsilon = await staker.epsilon();
-  
+
       // check actual maxWithdraw is between the calculated one and the calculated one + epsilon
-  
+
       expect(
         maxWithdrawStaker
       ).to.be.greaterThan(
         maxWithdrawCalculatedNew
       );
-  
+
       expect(
         maxWithdrawStaker
       ).to.be.lessThanOrEqual(
@@ -187,7 +187,7 @@ describe("GETTERS", () => {
 
       await staker.connect(one).deposit(parseEther(1e4), one.address);
 
-      for(let i = 0; i<5; i++){ 
+      for(let i = 0; i<5; i++){
         await submitCheckpoint(i);
 
         // 1
@@ -216,6 +216,24 @@ describe("GETTERS", () => {
       expect(await staker.symbol()).to.equal(constants.SYMBOL);
     });
   });
-});
+
+  describe("Validators", async () => {
+    it("getValidators", async () => {
+      expect(await staker.getValidators()).includes(validatorShare.address);
+    });
+
+    it("get all validators, whether they are active, and the amount staked", async () => {
+      await staker.addValidator(one.address);
+      await staker.addValidator(two.address);
+      await staker.disableValidator(two.address);
+
+      expect(await staker.connect(one).getAllValidators()).to.deep.equal([
+        [constants.VALIDATOR_STATE.ENABLED, 0, validatorShare.address],
+        [constants.VALIDATOR_STATE.ENABLED, 0, one.address],
+        [constants.VALIDATOR_STATE.DISABLED, 0, two.address],
+      ])
+      });
+    });
+  });
 
 // todo: write some tests which fail without the magic number

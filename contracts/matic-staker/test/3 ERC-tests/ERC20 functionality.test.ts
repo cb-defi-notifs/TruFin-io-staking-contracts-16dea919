@@ -12,13 +12,13 @@ describe("TruMATIC ERC20 Functionality", () => {
     beforeEach(async () => {
       // reset to fixture
       ({ treasury, one, two, three, staker, deployer } = await loadFixture(deployment));
-      TREASURY_INITIAL_DEPOSIT = parseEther(100); 
+      TREASURY_INITIAL_DEPOSIT = parseEther(100);
       await staker.connect(treasury).deposit(TREASURY_INITIAL_DEPOSIT, treasury.address);
     });
         it('has a name', async function () {
             expect(await staker.name()).to.equal(name);
         });
-        
+
         it('has a symbol', async function () {
         expect(await staker.symbol()).to.equal(symbol);
         });
@@ -39,9 +39,9 @@ describe("TruMATIC ERC20 Functionality", () => {
             });
 
             it("totalSupply is not altered by rewards accrual without deposit", async function() {
-            // accrue rewards 
+            // accrue rewards
             await submitCheckpoint(0);
-     
+
             // totalSupply should not have increased as no new shares are minted
             expect(await staker.totalSupply()).to.equal(totalSupply);
             });
@@ -73,7 +73,7 @@ describe("TruMATIC ERC20 Functionality", () => {
                 expect(await staker.balanceOf(one.address)).to.equal(0);
                 expect(await staker.balanceOf(two.address)).to.equal(0);
             })
-            
+
             it("withdraw requests post accrual decrease totalSupply correctly", async function(){
                 const withdrawAmount = parseEther(1000);
                 // ACCRUE
@@ -88,7 +88,7 @@ describe("TruMATIC ERC20 Functionality", () => {
 
                 // Treasury Shares
                 const trsyShares = calculateTrsyWithdrawFees(totalRewards,[globalSharePriceNumerator,globalSharePriceDenominator])
-            
+
                 await staker.connect(two).withdraw(withdrawAmount,two.address,two.address);
                 // expect the new totalSupply to be treasury deposit amount + user3 amount left + shares minted to treasury
                 expect(await staker.totalSupply()).to.equal(TREASURY_INITIAL_DEPOSIT.add(withdrawAmount).add(trsyShares));
@@ -106,7 +106,7 @@ describe("TruMATIC ERC20 Functionality", () => {
             await staker.connect(one).deposit(parseEther(2000),one.address);
             let [globalSharePriceNumerator, globalSharePriceDenominator] = await staker.sharePrice();
             expect(globalSharePriceNumerator.div(globalSharePriceDenominator)).to.equal(parseEther(1));
-            
+
             // accrue rewards
             await submitCheckpoint(0);
             [globalSharePriceNumerator, globalSharePriceDenominator] = await staker.sharePrice();
@@ -126,13 +126,13 @@ describe("TruMATIC ERC20 Functionality", () => {
         // attempt to transfer TruMATIC
         await staker.connect(one).transfer(two.address, parseEther(1000));
 
-        // check TruMATIC was transferred 
+        // check TruMATIC was transferred
         expect(await staker.balanceOf(two.address)).to.equal(parseEther(1000));
         expect(await staker.balanceOf(one.address)).to.equal(parseEther(1000));
       });
 
         it("Reverts with custom error if more than users balance is transferred",async function() {
-            // override beforetokentransfer function 
+            // override beforetokentransfer function
             await expect(staker.connect(one).transfer(two.address,parseEther(2000))).to.be.revertedWithCustomError(staker,"ExceedsUnallocatedBalance");
         });
 
@@ -141,7 +141,7 @@ describe("TruMATIC ERC20 Functionality", () => {
         await staker.connect(one).deposit(parseEther(2000), one.address);
         expect(await staker.balanceOf(two.address)).to.equal(parseEther(0));
         expect(await staker.balanceOf(one.address)).to.equal(parseEther(2000));
-        
+
         // loose allocation
         await staker.connect(one).allocate(parseEther(2000), two.address, false);
 
@@ -182,7 +182,7 @@ describe("TruMATIC ERC20 Functionality", () => {
       });
 
       it("transferFrom after loose allocation works", async function () {
-        // deposit 
+        // deposit
         await staker.connect(one).deposit(allowance.mul(2), one.address);
 
         // loose allocation
@@ -192,7 +192,7 @@ describe("TruMATIC ERC20 Functionality", () => {
         await staker.connect(one).approve(two.address, allowance);
         await staker.connect(two).transferFrom(one.address, two.address, allowance);
 
-        // check new Balances/allowance 
+        // check new Balances/allowance
         expect(await staker.allowance(one.address, two.address)).to.equal(0);
         expect(await staker.balanceOf(one.address)).to.equal(allowance);
         expect(await staker.balanceOf(two.address)).to.equal(allowance);
@@ -219,8 +219,8 @@ describe("TruMATIC ERC20 Functionality", () => {
         await submitCheckpoint(0);
 
         // distribute rewards
-        await staker.connect(one).distributeRewards(two.address, one.address, true);
-        await staker.connect(two).distributeRewards(one.address, two.address, false);
+        await staker.connect(one).distributeRewards(two.address, one.address, true, false);
+        await staker.connect(two).distributeRewards(one.address, two.address, false, false);
 
         // totalSupply should remain unchanged
         expect(await staker.totalSupply()).to.equal(totalSupply);
@@ -234,7 +234,7 @@ describe("TruMATIC ERC20 Functionality", () => {
         // deposit
         await staker.connect(one).deposit(parseEther(2000), one.address);
 
-        // allocation 
+        // allocation
         await staker.connect(one).allocate(parseEther(2000), two.address, true);
 
         await expect(staker.connect(one).transfer(two.address, parseEther(1000))).to.be.revertedWithCustomError(

@@ -16,6 +16,7 @@ describe("MULTI CHECKPOINTS", () => {
   // Test constants
     const ALLOCATED_AMOUNT = parseEther(10000);
     const STRICTNESS = true;
+    const DISTRIBUTION_IN_MATIC = false;
     const TREASURY_INITIAL_DEPOSIT = parseEther(100);
 
   // Set up initial test state
@@ -79,8 +80,8 @@ describe("MULTI CHECKPOINTS", () => {
     await submitCheckpoint(1);
 
     // DISTRIBUTE
-    await staker.connect(two).distributeAll(one.address, STRICTNESS);
-    const twoTruMATICbalance = await staker.maxRedeem(two.address); 
+    await staker.connect(two).distributeAll(one.address, STRICTNESS, DISTRIBUTION_IN_MATIC);
+    const twoTruMATICbalance = await staker.maxRedeem(two.address);
 
     // check share balances (TruMATIC), one deposit_amount still allocated, hence zero
     expect(await staker.maxRedeem(one.address)).to.equal(0);
@@ -90,13 +91,13 @@ describe("MULTI CHECKPOINTS", () => {
     await submitCheckpoint(2);
 
     // DISTRIBUTE
-    await staker.distributeRewards(two.address, one.address, STRICTNESS);
+    await staker.distributeRewards(two.address, one.address, STRICTNESS, DISTRIBUTION_IN_MATIC);
     const twoTruMATICbalanceAfterAnotherAccrual = await staker.maxRedeem(two.address)
     expect(twoTruMATICbalanceAfterAnotherAccrual).to.be.greaterThan(twoTruMATICbalance);
 
     // ACCRUE 4
     await submitCheckpoint(3);
-        
+
     // DEALLOCATE
     await staker.connect(one).deallocate(ALLOCATED_AMOUNT, two.address, STRICTNESS);
     expect(await staker.maxRedeem(two.address)).to.be.greaterThan(twoTruMATICbalanceAfterAnotherAccrual);
@@ -115,18 +116,18 @@ describe("MULTI CHECKPOINTS", () => {
     // allocated_amount has been deallocated (unlocked)
     expect(await staker.maxWithdraw(one.address)).to.be.closeTo(ALLOCATED_AMOUNT.add(EPSILON), 1e1);
 
-    // ACCRUE 
+    // ACCRUE
     await submitCheckpoint(4);
 
     // WITHDRAW
     // withdraw one
-    let oneMaxWithdraw = await staker.maxWithdraw(one.address); 
+    let oneMaxWithdraw = await staker.maxWithdraw(one.address);
     expect(oneMaxWithdraw).to.be.greaterThan(ALLOCATED_AMOUNT.add(EPSILON));
     await staker.connect(one).withdraw(oneMaxWithdraw, one.address, one.address);
     // withdraw two
     let twoMaxWithdraw = await staker.maxWithdraw(two.address);
     await staker.connect(two).withdraw(twoMaxWithdraw, two.address, two.address);
-    
+
     // treasury withdrawal
     let trsyMaxWithdraw = await staker.maxWithdraw(treasury.address);
     await staker.connect(treasury).withdraw(trsyMaxWithdraw, treasury.address, treasury.address);
@@ -149,31 +150,29 @@ describe("MULTI CHECKPOINTS", () => {
     // ACCRUE
     await submitCheckpoint(1);
 
-    // DISTRIBUTE 
-    await staker.connect(one).distributeAll(one.address, false);
+    // DISTRIBUTE
+    await staker.connect(one).distributeAll(one.address, false, DISTRIBUTION_IN_MATIC);
     // does not deallocate
-    await staker.connect(one).distributeAll(one.address, true);
+    await staker.connect(one).distributeAll(one.address, true, DISTRIBUTION_IN_MATIC);
 
     // rewards distribution
-    const oneMaxWithdraw = await staker.maxWithdraw(one.address); 
+    const oneMaxWithdraw = await staker.maxWithdraw(one.address);
     const twoMaxWithdraw = await staker.maxWithdraw(two.address);
     expect(oneMaxWithdraw).to.be.closeTo(EPSILON.add(calculateAmountFromShares(await staker.maxRedeem(one.address), await staker.sharePrice())), 1e0);
     expect(twoMaxWithdraw).to.closeTo(EPSILON.add(calculateAmountFromShares(await staker.maxRedeem(two.address), await staker.sharePrice())), 1e0);
     expect(await staker.maxWithdraw(three.address)).to.equal(0);
 
     // one gets 0% of the rewards (all go to two, strict and loose)
-    const oneRewards = oneMaxWithdraw.sub(half).sub(EPSILON); 
+    const oneRewards = oneMaxWithdraw.sub(half).sub(EPSILON);
     expect(oneRewards).to.be.closeTo(0, 1e0);
   });
-
-
 
   it("Reallocate, deallocate a strict and a loose allocation (without calling distribute), forces distribution of rewards in case of strict. for loose it is the same as having had no allocation", async () => {
     // allocate strictly and non-strictly
     const half = ALLOCATED_AMOUNT.div(2)
     await staker.connect(one).allocate(half, two.address, true);
     await staker.connect(one).allocate(half, three.address, false);
-    
+
     const oldSp = await staker.sharePrice()
 
     // ACCRUE
@@ -190,9 +189,9 @@ describe("MULTI CHECKPOINTS", () => {
     const calculatedRewards = calculateRewardsDistributed(half,oldSp,await staker.sharePrice())
     await staker.connect(one).deallocate(half, two.address, false);
     await staker.connect(one).deallocate(half, two.address, true);
-    
+
     // 50% rewards to depositor/one, 50% rewards to two
-    const oneMaxWithdraw = await staker.maxWithdraw(one.address); 
+    const oneMaxWithdraw = await staker.maxWithdraw(one.address);
     const twoMaxWithdraw = await staker.maxWithdraw(two.address);
 
     expect(oneMaxWithdraw).to.be.closeTo(EPSILON.add(calculateAmountFromShares(await staker.maxRedeem(one.address), await staker.sharePrice())), 1e0);
@@ -230,22 +229,22 @@ describe("MULTI CHECKPOINTS", () => {
     await staker.connect(one).allocate(half, two.address, false);
     await staker.connect(four).deallocate(half, six.address, false);
     await staker.connect(four).allocate(half, five.address, false);
-   
+
     // ACCRUE
     await submitCheckpoint(1);
 
     // DISTRIBUTE
-    await staker.connect(one).distributeAll(one.address, false);
+    await staker.connect(one).distributeAll(one.address, false, DISTRIBUTION_IN_MATIC);
     const twoLooseRewards = await staker.maxWithdraw(two.address);
     // strict rewards
-    await staker.connect(one).distributeAll(one.address, true);
+    await staker.connect(one).distributeAll(one.address, true, DISTRIBUTION_IN_MATIC);
 
-    await staker.connect(four).distributeAll(four.address, false);
+    await staker.connect(four).distributeAll(four.address, false, DISTRIBUTION_IN_MATIC);
     const fiveLooseRewards = await staker.maxWithdraw(five.address);
     // strict rewards
-    await staker.connect(four).distributeAll(four.address, true);
+    await staker.connect(four).distributeAll(four.address, true, DISTRIBUTION_IN_MATIC);
 
-    const oneMaxWithdraw = await staker.maxWithdraw(one.address); 
+    const oneMaxWithdraw = await staker.maxWithdraw(one.address);
     const twoMaxWithdraw = await staker.maxWithdraw(two.address);
 
     const fourMaxWithdraw = await staker.maxWithdraw(four.address);
@@ -258,12 +257,12 @@ describe("MULTI CHECKPOINTS", () => {
 
 
     // first batch of loose rewards goes to one, is more than the second batch
-    const oneRewards = oneMaxWithdraw.sub(half).sub(EPSILON); 
+    const oneRewards = oneMaxWithdraw.sub(half).sub(EPSILON);
     const fourRewards = fourMaxWithdraw.sub(half).sub(EPSILON);
 
     // rewards of earlier accrual step should be larger than later
     expect(oneRewards).to.be.greaterThan(twoLooseRewards);
-    
+
     // rewards of both workflows
     expect(oneRewards).to.equal(fourRewards);
   });

@@ -12,7 +12,7 @@ const parseEther = ethers.utils.parseEther;
 describe("Staker", () => {
     let deployer, treasury, one, two, three, // accounts
     token, validatorShare, stakeManager, whitelist, staker; // contracts
- 
+
   beforeEach(async () => {
     ({
       deployer, treasury, one, two, three,

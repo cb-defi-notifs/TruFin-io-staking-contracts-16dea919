@@ -1,6 +1,7 @@
 /** Helper file exporting a testing fixture for fresh deployments. */
 
 import { ethers, upgrades } from "hardhat";
+import { smock } from '@defi-wonderland/smock';
 import * as constants from "../helpers/constants";
 import { AddressZero } from "@ethersproject/constants";
 import { setTokenBalancesAndApprove } from "./state-interaction";
@@ -10,32 +11,30 @@ export const deployment = async () => {
   // load deployed contracts
 
   const token = await ethers.getContractAt(
-    constants.STAKING_TOKEN_ABI[constants.DEFAULT_CHAIN_ID],
+    constants.STAKING_TOKEN_ABI,
     constants.STAKING_TOKEN_ADDRESS[constants.DEFAULT_CHAIN_ID]
   );
 
   const validatorShare = await ethers.getContractAt(
-    constants.VALIDATOR_SHARE_ABI[constants.DEFAULT_CHAIN_ID],
+    constants.VALIDATOR_SHARE_ABI,
     constants.VALIDATOR_SHARE_CONTRACT_ADDRESS[constants.DEFAULT_CHAIN_ID]
   );
 
+  const validatorShare2 = await ethers.getContractAt(
+    constants.VALIDATOR_SHARE_ABI,
+    constants.VALIDATOR_SHARE_2_CONTRACT_ADDRESS[constants.DEFAULT_CHAIN_ID]
+  );
+
   const stakeManager = await ethers.getContractAt(
-    constants.STAKE_MANAGER_ABI[constants.DEFAULT_CHAIN_ID],
+    constants.STAKE_MANAGER_ABI,
     constants.STAKE_MANAGER_CONTRACT_ADDRESS[constants.DEFAULT_CHAIN_ID]
   );
 
   // load signers, balances set to 10k ETH in hardhat config file
   const [deployer, treasury, one, two, three, four, five, six, seven] = await ethers.getSigners();
 
-  // load factories and deployer staker and whitelist
-
-  const whitelistFactory = await ethers.getContractFactory("MasterWhitelist");
-
-  const whitelist = await upgrades.deployProxy(whitelistFactory, [
-    AddressZero, // _reader
-    AddressZero, // _registry
-    [], // _countryBlacklist
-  ]);
+  // mock whitelist
+  const whitelist = await smock.fake(constants.WHITELIST_ABI);
 
   const stakerFactory = await ethers.getContractFactory("TruStakeMATICv2");
 
@@ -50,6 +49,10 @@ export const deployment = async () => {
     constants.CAP
   ]);
 
+
+  // make it the default validator
+  await staker.setDefaultValidator(validatorShare.address);
+
   // set each balance to 10M MATIC and approve it to staker
   await setTokenBalancesAndApprove(
     token,
@@ -59,12 +62,12 @@ export const deployment = async () => {
   );
 
   // add all users to whitelist
-  for (let user of [deployer, treasury, one, two, three, four, five]) {
-    await whitelist.connect(deployer).addUserToWhitelist(user.address);
-  }
+  whitelist.isUserWhitelisted.returns((params : [string]) => {
+    return [deployer, treasury, one, two, three, four, five].map(it => it.address).includes(params[0])
+  });
 
   return {
     deployer, treasury, one, two, three, four, five, six,  // accounts
-    token, validatorShare, stakeManager, whitelist, staker // contracts
+    token, validatorShare, validatorShare2, stakeManager, whitelist, staker // contracts
   }
 };

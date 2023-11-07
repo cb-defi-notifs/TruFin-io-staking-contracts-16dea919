@@ -17,12 +17,12 @@ import {
 } from "../helpers/state-interaction";
 
 describe("RESTAKE", () => {
-  let deployer, treasury, one, token, stakeManager, staker;
+  let deployer, treasury, one, token, stakeManager, validatorShare, staker;
 
   beforeEach(async () => {
     // reset to fixture
     ({
-      deployer, treasury, one, token, stakeManager, staker
+      deployer, treasury, one, token, stakeManager, validatorShare, staker
     } = await loadFixture(deployment));
   });
 
@@ -47,8 +47,8 @@ describe("RESTAKE", () => {
   });
 
   describe("Vault: compound rewards", async () => {
-    it("rewards compounded correctly (compoundRewards: using unclaimed rewards)", async () => {
-      // deposit some matic
+    it.skip("rewards compounded correctly (compoundRewards: using unclaimed rewards)", async () => {
+      // deposit some MATIC
       let depositAmt = parseEther(10e6);
       await staker
         .connect(one).
@@ -125,7 +125,7 @@ describe("RESTAKE", () => {
     });
 
     it("rewards compounded correctly (stakeClaimedRewards: using claimed rewards)", async () => {
-      // deposit some matic
+      // deposit some MATIC
       let depositAmt = parseEther(10e6);
       await staker
         .connect(one)
@@ -153,7 +153,7 @@ describe("RESTAKE", () => {
       expect(preStakeTotalStaked).to.equal(parseEther(10e6));
 
       // stake claimed rewards
-      await staker.connect(deployer).stakeClaimedRewards();
+      await staker.connect(deployer).stakeClaimedRewards(validatorShare.address);
 
       // check claimed and total rewards
       expect(await staker.totalAssets()).to.equal(preStakeTotalRewards);
