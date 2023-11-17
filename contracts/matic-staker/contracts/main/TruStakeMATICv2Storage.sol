@@ -6,7 +6,6 @@ import {Withdrawal, Allocation, Validator} from "./Types.sol";
 
 /// @title TruStakeMATICStorage
 abstract contract TruStakeMATICv2Storage {
-    // Staker constants
 
     /// @notice Address of MATIC on this chain (Ethereum and Goerli supported).
     address public stakingTokenAddress;
@@ -28,12 +27,12 @@ abstract contract TruStakeMATICv2Storage {
     /// @dev Fee in basis points.
     uint256 public phi;
 
-    /// @notice Size of fee taken on non-strict allocations.
+    /// @notice Size of fee taken on allocations.
     /// @dev Distribution fee in basis points.
     uint256 public distPhi;
 
-    /// @notice Cap on total amount staked with the validator.
-    uint256 public cap;
+    /// @notice Deprecated but here for storage considerations.
+    uint256 public deprecated1;
 
     /// @notice Mapping to keep track of (user, amount) values for each unbond nonce.
     /// @dev Legacy mapping to keep track of pre-upgrade withdrawal claims.
@@ -55,8 +54,8 @@ abstract contract TruStakeMATICv2Storage {
     /// @notice Value to offset rounding errors.
     uint256 public epsilon;
 
-    /// @notice Strictness lock.
-    bool public allowStrict;
+    /// @notice Deprecated but here for storage considerations.
+    bool public deprecated2;
 
     /// @notice Cap on the smallest amount one can deposit to the staker.
     uint256 public minDeposit;
@@ -68,7 +67,7 @@ abstract contract TruStakeMATICv2Storage {
     address[] public validatorAddresses;
 
     /// @notice Mapping to keep track of the withdrawals (user, amount) for each unbond nonce for each validator.
-    mapping(address => mapping(uint256 => Withdrawal)) public withdrawals ;
+    mapping(address => mapping(uint256 => Withdrawal)) public withdrawals;
 
     /// @notice Gap for upgradeability.
     uint256[44] private __gap;

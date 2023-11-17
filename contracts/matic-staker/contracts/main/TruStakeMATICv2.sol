@@ -50,8 +50,7 @@ contract TruStakeMATICv2 is
     /// @param _whitelistAddress The vault's whitelist contract address.
     /// @param _treasuryAddress Treasury address that receives vault fees.
     /// @param _phi Fee taken on restake in basis points.
-    /// @param _distPhi Fee taken during the distribution of rewards earned from loose allocations.
-    /// @param _cap Limit placed on combined vault deposits.
+    /// @param _distPhi Fee taken during the distribution of rewards earned from allocations.
     function initialize(
         address _stakingTokenAddress,
         address _stakeManagerContractAddress,
@@ -59,8 +58,7 @@ contract TruStakeMATICv2 is
         address _whitelistAddress,
         address _treasuryAddress,
         uint256 _phi,
-        uint256 _distPhi,
-        uint256 _cap
+        uint256 _distPhi
     ) external initializer {
         // Initialize derived state
         __ReentrancyGuard_init();
@@ -91,10 +89,8 @@ contract TruStakeMATICv2 is
         whitelistAddress = _whitelistAddress;
         treasuryAddress = _treasuryAddress;
         phi = _phi;
-        cap = _cap;
         distPhi = _distPhi;
         epsilon = 1e4;
-        allowStrict = false;
         minDeposit = 1e18; // default minimum is 1 MATIC
 
         emit StakerInitialized(
@@ -104,7 +100,6 @@ contract TruStakeMATICv2 is
             _whitelistAddress,
             _treasuryAddress,
             _phi,
-            _cap,
             _distPhi
         );
     }
@@ -124,9 +119,10 @@ contract TruStakeMATICv2 is
     // *** VAULT INFO ***
 
     /// @notice Gets the total amount of MATIC currently staked by the vault.
-    /// @return stake Total amount of MATIC staked by the vault via validator delegation.
-    function totalStaked() public view returns (uint256 stake) {
+    /// @return Total amount of MATIC staked by the vault across all validator delegations.
+    function totalStaked() public view returns (uint256) {
         uint256 validatorCount = validatorAddresses.length;
+        uint256 stake;
         for (uint256 i; i < validatorCount;){
             stake += validators[validatorAddresses[i]].stakedAmount;
             unchecked{
@@ -137,9 +133,10 @@ contract TruStakeMATICv2 is
     }
 
     /// @notice Gets the total unclaimed MATIC rewards on all validators.
-    /// @return validatorRewards Total amount of MATIC rewards earned through all validators.
-    function totalRewards() public view returns (uint256 validatorRewards) {
+    /// @return Total amount of MATIC rewards earned through all validators.
+    function totalRewards() public view returns (uint256) {
         uint256 validatorCount = validatorAddresses.length;
+        uint256 validatorRewards;
         for (uint256 i; i < validatorCount;){
             validatorRewards += IValidatorShare(validatorAddresses[i]).getLiquidRewards(address(this));
             unchecked{
@@ -151,8 +148,8 @@ contract TruStakeMATICv2 is
 
     /// @notice Gets the price of one TruMATIC share in MATIC.
     /// @dev Represented via a fraction. Factor of 1e18 included in numerator to avoid rounding errors (currently redundant).
-    /// @return globalPriceNum Numerator of the vault's share price fraction.
-    /// @return globalPriceDenom Denominator of the vault's share price fraction.
+    /// @return Numerator of the vault's share price fraction.
+    /// @return Denominator of the vault's share price fraction.
     function sharePrice() public view returns (uint256, uint256) {
         if (totalSupply() == 0) return (1e18, 1);
 
@@ -161,22 +158,18 @@ contract TruStakeMATICv2 is
             (PHI_PRECISION - phi) *
             totalRewards();
 
-        // Calculate share price fraction components
-        uint256 globalPriceNum = totalCapitalTimesPhiPrecision * 1e18;
-        uint256 globalPriceDenom = totalSupply() * PHI_PRECISION;
-
-        return (globalPriceNum, globalPriceDenom);
+        return (totalCapitalTimesPhiPrecision * 1e18, totalSupply() * PHI_PRECISION);
     }
 
     // *** GETTERS ***
 
     /// @notice Convenience getter for retrieving user-relevant info.
     /// @param _user Address of the user.
-    /// @return maxRedeemable Maximum TruMATIC that can be redeemed by the user.
-    /// @return maxWithdrawAmount Maximum MATIC that can be withdrawn by the user.
-    /// @return globalPriceNum Numerator of the vault's share price fraction.
-    /// @return globalPriceDenom Denominator of the vault's share price fraction.
-    /// @return epoch Current Polygon epoch.
+    /// @return Maximum TruMATIC that can be redeemed by the user.
+    /// @return Maximum MATIC that can be withdrawn by the user.
+    /// @return Numerator of the vault's share price fraction.
+    /// @return Denominator of the vault's share price fraction.
+    /// @return Current Polygon epoch.
     function getUserInfo(address _user) public view returns (uint256, uint256, uint256, uint256, uint256) {
         (uint256 globalPriceNum, uint256 globalPriceDenom) = sharePrice();
         uint256 maxRedeemable = maxRedeem(_user);
@@ -187,7 +180,7 @@ contract TruStakeMATICv2 is
     }
 
     /// @notice Retrieves information for all supported validators.
-    /// @return validatorArray An array of structs containing details for each validator.
+    /// @return An array of structs containing details for each validator.
     function getAllValidators() public view returns (Validator[] memory){
         uint256 validatorCount = validatorAddresses.length;
         Validator[] memory validatorArray = new Validator[](validatorCount);
@@ -223,7 +216,7 @@ contract TruStakeMATICv2 is
         return IValidatorShare(_validator).unbondNonces(address(this));
     }
 
-    /// @notice Returns the addresses of the validators that are added to the contract.
+    /// @notice Returns the addresses of the validators that are supported by the contract.
     function getValidators() external view returns (address[] memory) {
         return validatorAddresses;
     }
@@ -236,21 +229,19 @@ contract TruStakeMATICv2 is
 
     /// @notice Gets a recipient's distributors.
     /// @param _user The recipient.
-    /// @param _strict Whether to get strict-distributors (true) or loose distributors (false).
     /// @return The recipient's distributors.
-    function getDistributors(address _user, bool _strict) public view returns (address[] memory) {
-        return distributors[_user][_strict];
+    function getDistributors(address _user) public view returns (address[] memory) {
+        return distributors[_user][false];
     }
 
     /// @notice Gets a distributor's recipients.
     /// @param _user The distributor.
-    /// @param _strict Whether to get strict-recipients (true) or loose recipients (false).
     /// @return The distributor's recipients.
-    function getRecipients(address _user, bool _strict) public view returns (address[] memory) {
-        return recipients[_user][_strict];
+    function getRecipients(address _user) public view returns (address[] memory) {
+        return recipients[_user][false];
     }
 
-    /// @notice Checks if the unbond specified via the input nonce can be claimed from the delegator.
+    /// @notice Checks if the unbond specified via the _unbondNonce can be claimed from the validator.
     /// @dev Cannot check the claimability of pre-upgrade unbonds.
     /// @param _unbondNonce Nonce of the unbond under consideration.
     /// @param _validator The address of the validator.
@@ -273,26 +264,6 @@ contract TruStakeMATICv2 is
 
     // *** MAXIMUMS ***
 
-    /// @notice Gets the maximum amount of MATIC a user could deposit into the vault.
-    /// @dev maxDeposit is independent of the user, so while an address is passed in for ERC4626
-    /// compliance, it is never used.
-    /// @return The amount of MATIC.
-    function maxDeposit(address) public view override returns (uint256) {
-        uint256 totalStakedMATIC = totalStaked();
-
-        if (totalStakedMATIC >= cap) return 0;
-
-        return cap - totalStakedMATIC;
-    }
-
-    /// @notice Gets the maximum number of TruMATIC shares a user could mint.
-    /// @dev maxMint is independent of the user, so while an address is passed in for ERC4626
-    /// compliance, it is never used.
-    /// @return The amount of TruMATIC.
-    function maxMint(address) public view override returns (uint256) {
-        return previewDeposit(maxDeposit(address(0)));
-    }
-
     /// @notice Gets the maximum amount of MATIC a user can withdraw from the vault.
     /// @param _user The user under consideration.
     /// @return The amount of MATIC.
@@ -304,29 +275,6 @@ contract TruStakeMATICv2 is
         }
 
         return preview + epsilon;
-    }
-
-    /// @notice Gets the maximum number of TruMATIC shares a user can redeem into MATIC.
-    /// @param _user The user under consideration.
-    /// @return The amount of TruMATIC.
-    function maxRedeem(address _user) public view override returns (uint256) {
-        Allocation storage totalAllocation = totalAllocated[_user][true];
-
-        // Cache from storage
-        uint256 maticAmount = totalAllocation.maticAmount;
-
-        // Redeemer can't withdraw shares equivalent to their total allocation plus its rewards
-        uint256 unredeemableShares = (maticAmount == 0)
-            ? 0
-            : MathUpgradeable.mulDiv(
-                totalAllocation.maticAmount * 1e18,
-                totalAllocation.sharePriceDenom,
-                totalAllocation.sharePriceNum,
-                MathUpgradeable.Rounding.Up
-            );
-
-        // We rounded up unredeemableShares to ensure excess shares are not returned
-        return balanceOf(_user) > unredeemableShares ? balanceOf(_user) - unredeemableShares : 0;
     }
 
     /// @notice Anticipates the amount of MATIC someone can redeem based on the number of TruMATIC shares.
@@ -347,7 +295,8 @@ contract TruStakeMATICv2 is
     /// on behalf of a different `_receiver`, this functionality is currently disabled in the TruMATICv2
     /// contract as the share management system has not been designed for it. If use of this functionality is
     /// attempted, the transaction will revert.
-    /// @return The resulting amount of TruMATIC shares minted to the caller (receiver).
+    /// @dev The MATIC is staked with the default validator.
+    /// @return The resulting amount of TruMATIC shares minted to the caller.
     function deposit(uint256 _assets, address _receiver) public override onlyWhitelist nonReentrant returns (uint256) {
         if (msg.sender != _receiver) {
             revert SenderAndOwnerMustBeReceiver();
@@ -376,6 +325,7 @@ contract TruStakeMATICv2 is
     /// on behalf of a different `_receiver`, this functionality is currently disabled in the TruMATICv2
     /// contract as the share management system has not been designed for it. If use of this functionality is
     /// attempted, the transaction will revert.
+    /// @dev The MATIC is staked with the default validator.
     /// @return The resulting amount of MATIC deposited into the vault.
     function mint(uint256 _shares, address _receiver) public override onlyWhitelist nonReentrant returns (uint256) {
         if (msg.sender != _receiver) {
@@ -389,27 +339,6 @@ contract TruStakeMATICv2 is
         return assets;
     }
 
-    /// @notice Mints an amount of vault shares to the caller.
-    /// @dev Requires equivalent value of MATIC to be approved to the vault by the caller (converted using current share price).
-    /// @param _shares The amount of shares to mint.
-    /// @param _receiver The address to receive said TruMATIC shares (must be caller to avoid reversion).
-    /// @dev Although the ERC-4626 standard stipulates an approved user should be able to call this function
-    /// on behalf of a different `_receiver`, this functionality is currently disabled in the TruMATICv2
-    /// contract as the share management system has not been designed for it. If use of this functionality is
-    /// attempted, the transaction will revert.
-    /// @param _validator Address of the validator the user is minting from.
-    /// @return The resulting amount of MATIC deposited into the vault.
-    function mintFromSpecificValidator(uint256 _shares, address _receiver, address _validator) public onlyWhitelist nonReentrant returns (uint256) {
-        if (msg.sender != _receiver) {
-            revert SenderAndOwnerMustBeReceiver();
-        }
-
-        uint256 assets = previewMint(_shares);
-
-        _deposit(msg.sender, assets, _validator);
-
-        return assets;
-    }
 
     // *** LEAVING THE VAULT ***
 
@@ -426,7 +355,8 @@ contract TruStakeMATICv2 is
     /// assets they'd like to withdraw (another stipulation of the standard). Therefore, that is not the case with this
     /// function, and users will need to call `withdrawClaim(uint256)` following an unbonding period in order to receive
     /// their assets.
-    /// @return The resulting amount of TruMATIC shares burned from the caller (owner).
+    /// @dev The MATIC is unstaked from the default validator.
+    /// @return The resulting amount of TruMATIC shares burned from the caller.
     function withdraw(
         uint256 _assets,
         address _receiver,
@@ -441,11 +371,11 @@ contract TruStakeMATICv2 is
         return previewWithdraw(_assets);
     }
 
-    /// @notice Initiates a withdrawal request for an amount of MATIC from the specified validator
+    /// @notice Initiates a withdrawal request for an amount of MATIC from the vault
     /// and burns corresponding TruMATIC shares.
     /// @param _assets The amount of MATIC to withdraw.
-    /// @param _validator The address of the validator from which to withdraw.
-    /// @return The resulting amount of TruMATIC shares burned from the caller (owner).
+    /// @param _validator The address of the validator from which to unstake.
+    /// @return The resulting amount of TruMATIC shares burned from the caller.
     function withdrawFromSpecificValidator(
         uint256 _assets,
         address _validator) public onlyWhitelist nonReentrant returns (uint256) {
@@ -471,6 +401,7 @@ contract TruStakeMATICv2 is
     /// shares they'd like to withdraw (another stipulation of the standard). Therefore, that is not the case with this
     /// function, and users will need to call `withdrawClaim(uint256)` following an unbonding period in order to receive
     /// their assets.
+    /// @dev The MATIC is unstaked from the default validator.
     /// @return The amount of MATIC scheduled for withdrawal from the vault.
     function redeem(
         uint256 _shares,
@@ -490,16 +421,16 @@ contract TruStakeMATICv2 is
 
     // *** CLAIMING WITHDRAWALS ***
 
-    /// @notice Claims a previous requested and now unbonded withdrawal.
+    /// @notice Claims a previously requested and now unbonded withdrawal.
     /// @param _unbondNonce Nonce of the corresponding delegator unbond.
-    /// @param _validator Address of the validator to claim the rewards from.
+    /// @param _validator Address of the validator to claim the withdrawal from.
     function withdrawClaim(uint256 _unbondNonce, address _validator) external onlyWhitelist nonReentrant {
         _withdrawClaim(_unbondNonce, _validator);
     }
 
     /// @notice Claims multiple previously requested and now unbonded withdrawals from a specified validator.
     /// @param _unbondNonces List of delegator unbond nonces corresponding to said withdrawals.
-    /// @param _validator Address of the validator to claim the rewards from.
+    /// @param _validator Address of the validator to claim the withdrawals from.
     function claimList(uint256[] calldata _unbondNonces, address _validator) external onlyWhitelist nonReentrant {
         uint256 len = _unbondNonces.length;
 
@@ -512,23 +443,27 @@ contract TruStakeMATICv2 is
         }
     }
 
-    /// @notice Stakes MATIC lingering in the vault to the default validator.
-    /// @dev Such MATIC arrives in the vault via auto-claiming during vault delegations/unbonds (buy/sell validator vouchers).
-    /// @param _validator Address of the validator to stake the claimed rewards to.
-    function stakeClaimedRewards(address _validator) external nonReentrant {
-        _deposit(address(0), 0, _validator);
-    }
-
-    /// @notice Restakes the vault's current unclaimed delegation-earned rewards.
+    /// @notice Restakes the vault's current unclaimed delegation-earned rewards on the respective validators and
+    /// stakes MATIC lingering in the vault to the validator provided.
     /// @dev Can be called manually to prevent the rewards surpassing reserves. This could lead to insufficient funds for
     /// withdrawals, as they are taken from delegated MATIC and not its rewards.
-    function compoundRewards() external nonReentrant {
+    /// @param _validator Address of the validator where MATIC in the vault should be staked to.
+    function compoundRewards(address _validator) external nonReentrant {
+
         uint256 amountRestaked = totalRewards();
-
+        uint256 totalAssetBalance = totalAssets();
         // To keep share price constant when rewards are staked, new shares need to be minted
-        uint256 shareIncrease = convertToShares(totalStaked() + amountRestaked + totalAssets()) - totalSupply();
+        uint256 shareIncrease = convertToShares(totalStaked() + totalAssetBalance + amountRestaked) - totalSupply();
 
-        _restake(defaultValidatorAddress);
+        _restake();
+
+        // if there is MATIC in the vault, stake it with the provided validator
+        if (totalAssetBalance > 0){
+            if (validators[_validator].state != ValidatorState.ENABLED) {
+                revert ValidatorNotEnabled();
+            }
+            _deposit(address(0), 0, _validator);
+        }
 
         // Minted shares are given to the treasury to effectively take a fee
         _mint(treasuryAddress, shareIncrease);
@@ -542,17 +477,13 @@ contract TruStakeMATICv2 is
     // *** ALLOCATIONS ***
 
     /// @notice Allocates the validation rewards earned by an amount of the caller's staked MATIC to a user.
-    /// @param _amount The amount of staked MATIC.
+    /// @param _amount The amount of staked MATIC to allocate.
     /// @param _recipient The address of the target recipient.
-    /// @param _strict  A value indicating whether the type of the allocation is strict(true) or loose(false).
-    function allocate(uint256 _amount, address _recipient, bool _strict) external onlyWhitelist nonReentrant {
-        if (_strict && !allowStrict) {
-            revert StrictAllocationDisabled();
-        }
+    function allocate(uint256 _amount, address _recipient) external onlyWhitelist nonReentrant {
         _checkNotZeroAddress(_recipient);
 
+        // can only allocate up to allocator's balance
         if (_amount > maxWithdraw(msg.sender)) {
-            // not strictly necessary but used anyway for loose allocations
             revert InsufficientDistributorBalance();
         }
 
@@ -560,19 +491,15 @@ contract TruStakeMATICv2 is
             revert AllocationUnderOneMATIC();
         }
 
+        // variables up here for stack too deep issues
         uint256 individualAmount;
         uint256 individualPriceNum;
         uint256 individualPriceDenom;
 
-        uint256 totalAmount;
-        uint256 totalNum;
-        uint256 totalDenom;
-        // variables up here for stack too deep issues
+        (uint256 globalPriceNum, uint256 globalPriceDenom) = sharePrice();
 
         {
-            (uint256 globalPriceNum, uint256 globalPriceDenom) = sharePrice();
-
-            Allocation storage oldIndividualAllocation = allocations[msg.sender][_recipient][_strict];
+            Allocation storage oldIndividualAllocation = allocations[msg.sender][_recipient][false];
             uint256 oldIndividualAllocationMaticAmount = oldIndividualAllocation.maticAmount;
 
             if (oldIndividualAllocationMaticAmount == 0) {
@@ -582,13 +509,12 @@ contract TruStakeMATICv2 is
                 individualPriceDenom = globalPriceDenom;
 
                 // update mappings to keep track of recipients for each dist and vice versa
-                distributors[_recipient][_strict].push(msg.sender);
-                recipients[msg.sender][_strict].push(_recipient);
+                distributors[_recipient][false].push(msg.sender);
+                recipients[msg.sender][false].push(_recipient);
             } else {
-                // performing update allocation
+                // if this adds to an existing allocation, update the individual allocation
 
                 individualAmount = oldIndividualAllocationMaticAmount + _amount;
-
                 individualPriceNum = oldIndividualAllocationMaticAmount * 1e22 + _amount * 1e22;
 
                 individualPriceDenom =
@@ -609,32 +535,38 @@ contract TruStakeMATICv2 is
                 // which minimises the amount that is distributed in `distributeRewards()`
             }
 
-            allocations[msg.sender][_recipient][_strict] = Allocation(
+            allocations[msg.sender][_recipient][false] = Allocation(
                 individualAmount,
                 individualPriceNum,
                 individualPriceDenom
             );
+        }
 
-            // set or update total allocation value for user
+        // set or update total allocation values for the distributor
+        uint256 totalAmount;
+        uint256 totalNum;
+        uint256 totalDenom;
 
-            Allocation storage totalAllocation = totalAllocated[msg.sender][_strict];
+        {
+            Allocation storage totalAllocation = totalAllocated[msg.sender][false];
+            uint256 totalAllocationMaticAmount = totalAllocation.maticAmount;
 
-            if (totalAllocation.maticAmount == 0) {
-                // set total allocated amount + share price
+            if (totalAllocationMaticAmount == 0) {
+                // for new distributors, set total allocated amount + share price
 
                 totalAmount = _amount;
                 totalNum = globalPriceNum;
                 totalDenom = globalPriceDenom;
             } else {
-                // update total allocated amount + share price
+                // for existing distributors, update total allocated amount + share price
 
-                totalAmount = totalAllocation.maticAmount + _amount;
+                totalAmount = totalAllocationMaticAmount + _amount;
 
-                totalNum = totalAllocation.maticAmount * 1e22 + _amount * 1e22;
+                totalNum = totalAllocationMaticAmount * 1e22 + _amount * 1e22;
 
                 totalDenom =
                     MathUpgradeable.mulDiv(
-                        totalAllocation.maticAmount * 1e22,
+                        totalAllocationMaticAmount * 1e22,
                         totalAllocation.sharePriceDenom,
                         totalAllocation.sharePriceNum,
                         MathUpgradeable.Rounding.Up
@@ -647,10 +579,10 @@ contract TruStakeMATICv2 is
                     );
 
                 // rounding total allocated share price denominator UP, in order to minimise the total allocation share price
-                // which maximises the amount owed by the distributor, which they cannot withdraw/transfer (strict allocations)
+                // which maximises the amount owed by the distributor
             }
 
-            totalAllocated[msg.sender][_strict] = Allocation(totalAmount, totalNum, totalDenom);
+            totalAllocated[msg.sender][false] = Allocation(totalAmount, totalNum, totalDenom);
         }
 
         emit Allocated(
@@ -661,18 +593,15 @@ contract TruStakeMATICv2 is
             individualPriceDenom,
             totalAmount,
             totalNum,
-            totalDenom,
-            _strict
+            totalDenom
         );
     }
 
     /// @notice Deallocates an amount of MATIC previously allocated to a user.
-    /// @dev Distributes any outstanding rewards to the recipient before deallocating (strict allocations only).
     /// @param _amount The amount the caller wishes to reduce the target's allocation by.
     /// @param _recipient The address of the user whose allocation is being reduced.
-    /// @param _strict A value indicating whether the type of the allocation is strict(true) or loose(false).
-    function deallocate(uint256 _amount, address _recipient, bool _strict) external onlyWhitelist nonReentrant {
-        Allocation storage individualAllocation = allocations[msg.sender][_recipient][_strict];
+    function deallocate(uint256 _amount, address _recipient) external onlyWhitelist nonReentrant {
+        Allocation storage individualAllocation = allocations[msg.sender][_recipient][false];
 
         uint256 individualSharePriceNum = individualAllocation.sharePriceNum;
         uint256 individualSharePriceDenom = individualAllocation.sharePriceDenom;
@@ -694,27 +623,16 @@ contract TruStakeMATICv2 is
             revert AllocationUnderOneMATIC();
         }
 
-        (uint256 globalPriceNum, uint256 globalPriceDenom) = sharePrice();
-
-        // check if the share price has moved - if yes, distribute first
-        if (
-            _strict &&
-            individualSharePriceNum / individualSharePriceDenom <
-            globalPriceNum / globalPriceDenom
-        ) {
-            _distributeRewardsUpdateTotal(_recipient, msg.sender, _strict, false);
-        }
-
         // check if this is a complete deallocation
         if (individualMaticAmount == 0) {
             // remove recipient from distributor's recipient array
-            delete allocations[msg.sender][_recipient][_strict];
+            delete allocations[msg.sender][_recipient][false];
 
-            address[] storage rec = recipients[msg.sender][_strict];
+            address[] storage rec = recipients[msg.sender][false];
             removeAddress(rec, _recipient);
 
             // remove distributor from recipient's distributor array
-            address[] storage dist = distributors[_recipient][_strict];
+            address[] storage dist = distributors[_recipient][false];
             removeAddress(dist, msg.sender);
         } else {
             individualAllocation.maticAmount = individualMaticAmount;
@@ -726,24 +644,14 @@ contract TruStakeMATICv2 is
         uint256 totalPriceNum;
         uint256 totalPriceDenom;
 
-        Allocation storage totalAllocation = totalAllocated[msg.sender][_strict];
+        Allocation storage totalAllocation = totalAllocated[msg.sender][false];
 
         uint256 totalAllocationMaticAmount = totalAllocation.maticAmount;
         totalAmount = totalAllocationMaticAmount - _amount;
 
         if (totalAmount == 0) {
-            delete totalAllocated[msg.sender][_strict];
+            delete totalAllocated[msg.sender][false];
         } else {
-            if(_strict){
-                individualSharePriceNum = globalPriceNum;
-                individualSharePriceDenom = globalPriceDenom;
-            }
-
-            // in the case of deallocating a strict allocation, rewards will have been distributed
-            // at the start of the deallocate function, therefore we must use the old share price
-            // in the weighted sum below to update the total allocation share price. This is because
-            // the individual share price has already been updated to the global share price.
-
             totalPriceNum = totalAllocationMaticAmount * 1e22 - _amount * 1e22;
 
             totalPriceDenom =
@@ -763,7 +671,7 @@ contract TruStakeMATICv2 is
             // rounding total allocated share price denominator UP, in order to minimise the total allocation share price
             // which maximises the amount owed by the distributor, which they cannot withdraw/transfer (strict allocations)
 
-            totalAllocated[msg.sender][_strict] = Allocation(totalAmount, totalPriceNum, totalPriceDenom);
+            totalAllocated[msg.sender][false] = Allocation(totalAmount, totalPriceNum, totalPriceDenom);
         }
 
 
@@ -773,159 +681,46 @@ contract TruStakeMATICv2 is
             individualMaticAmount,
             totalAmount,
             totalPriceNum,
-            totalPriceDenom,
-            _strict
+            totalPriceDenom
         );
     }
 
-    /// @notice Reallocates an amount of the caller's loosely allocated MATIC from one recipient to another.
-    /// @param _oldRecipient The previous recipient of the allocation.
-    /// @param _newRecipient The new recipient of the allocation.
-    function reallocate(address _oldRecipient, address _newRecipient) external onlyWhitelist nonReentrant {
-        _checkNotZeroAddress(_newRecipient);
-
-        // cannot reallocate to the original recipient
-        if (_oldRecipient == _newRecipient) {
-            revert AllocationToInitialRecipient();
-        }
-
-        // Loose allocations only => strictness = false
-        Allocation memory oldIndividualAllocation = allocations[msg.sender][_oldRecipient][false];
-
-        // assert that there is an old allocation
-        if (oldIndividualAllocation.maticAmount == 0) {
-            revert AllocationNonExistent();
-        }
-
-        Allocation storage newAllocation = allocations[msg.sender][_newRecipient][false];
-
-        uint256 individualAmount;
-        uint256 individualPriceNum;
-        uint256 individualPriceDenom;
-
-        // check if new recipient has already been allocated to
-        if (newAllocation.maticAmount == 0) {
-            // set new one
-            individualAmount = oldIndividualAllocation.maticAmount;
-            individualPriceNum = oldIndividualAllocation.sharePriceNum;
-            individualPriceDenom = oldIndividualAllocation.sharePriceDenom;
-
-            // replace the old recipient address with the new one
-            address[] storage rec = recipients[msg.sender][false];
-            uint256 rlen = rec.length;
-
-            for (uint256 i; i < rlen; ) {
-                if (rec[i] == _oldRecipient) {
-                    rec[i] = _newRecipient;
-                    break;
-                }
-
-                unchecked {
-                    ++i;
-                }
-            }
-
-            // to newRecipient's distributors array: add distributor
-            distributors[_newRecipient][false].push(msg.sender);
-        } else {
-            // update existing recipient allocation with weighted sum
-            individualAmount = oldIndividualAllocation.maticAmount + newAllocation.maticAmount;
-            individualPriceNum = oldIndividualAllocation.maticAmount * 1e22 + newAllocation.maticAmount * 1e22;
-
-            individualPriceDenom =
-                MathUpgradeable.mulDiv(
-                    oldIndividualAllocation.maticAmount * 1e22,
-                    oldIndividualAllocation.sharePriceDenom,
-                    oldIndividualAllocation.sharePriceNum,
-                    MathUpgradeable.Rounding.Down
-                ) +
-                MathUpgradeable.mulDiv(
-                    newAllocation.maticAmount * 1e22,
-                    newAllocation.sharePriceDenom,
-                    newAllocation.sharePriceNum,
-                    MathUpgradeable.Rounding.Down
-                );
-
-            // rounding individual allocation share price denominator DOWN, in order to maximise the individual allocation share price
-            // which minimises the amount that is distributed in `distributeRewards()`
-
-            // pop old one from recipients array
-            address[] storage rec = recipients[msg.sender][false];
-            removeAddress(rec, _oldRecipient);
-        }
-        // delete old one
-        delete allocations[msg.sender][_oldRecipient][false];
-        // set the new allocation amount
-        allocations[msg.sender][_newRecipient][false] = Allocation(
-            individualAmount,
-            individualPriceNum,
-            individualPriceDenom
-        );
-
-        // from oldRecipient's distributors array: pop distributor
-        address[] storage dist = distributors[_oldRecipient][false];
-        removeAddress(dist, msg.sender);
-
-        emit Reallocated(
-            msg.sender,
-            _oldRecipient,
-            _newRecipient,
-            individualAmount,
-            individualPriceNum,
-            individualPriceDenom
-        );
-    }
-
-    /// @notice Distributes allocation rewards from a distributor to a recipient.
-    /// @dev Caller must be a distributor of the recipient in the case of loose allocations or MATIC distributions.
+    /// @notice Distributes allocation rewards from the caller to a recipient.
     /// @param _recipient Address of allocation's recipient.
-    /// @param _distributor Address of allocation's distributor.
-    /// @param _strict A value indicating whether the type of the allocation is strict(true) or loose(false).
     /// @param _inMatic A value indicating whether the reward is in MATIC or not.
-    function distributeRewards(address _recipient, address _distributor, bool _strict, bool _inMatic) public nonReentrant {
-        if ((!_strict || _inMatic) && msg.sender != _distributor) {
-            revert OnlyDistributorCanDistributeRewards();
-        }
-
-        _distributeRewardsUpdateTotal(_recipient, _distributor, _strict, _inMatic);
+    function distributeRewards(address _recipient, bool _inMatic) public nonReentrant {
+        _distributeRewardsUpdateTotal(_recipient, msg.sender, _inMatic);
     }
 
-    /// @notice Distributes the rewards from a specific allocator's allocations to all their recipients.
-    /// @dev Caller must be a distributor of the recipient in the case of loose allocations or MATIC distributions.
-    /// @param _distributor Address of distributor whose allocations are to have their rewards distributed.
-    /// @param _strict A value indicating whether the type of the allocation is strict(true) or loose(false).
+    /// @notice Distributes the rewards from the caller's allocations to all their recipients.
     /// @param _inMatic A value indicating whether the reward is in MATIC or not.
-    function distributeAll(address _distributor, bool _strict, bool _inMatic) external nonReentrant {
-        if ((!_strict || _inMatic) && msg.sender != _distributor) {
-            revert OnlyDistributorCanDistributeRewards();
-        }
-
-        address[] storage rec = recipients[_distributor][_strict];
+    function distributeAll(bool _inMatic) external nonReentrant {
+        address[] storage rec = recipients[msg.sender][false];
         uint256 len = rec.length;
 
         (uint256 globalPriceNum, uint256 globalPriceDenom) = sharePrice();
 
         for (uint256 i; i < len; ) {
-            Allocation storage individualAllocation = allocations[_distributor][rec[i]][_strict];
+            Allocation storage individualAllocation = allocations[msg.sender][rec[i]][false];
 
             if (
                 individualAllocation.sharePriceNum / individualAllocation.sharePriceDenom <
                 globalPriceNum / globalPriceDenom
             ) {
-                _distributeRewards(rec[i], _distributor, _strict, false, _inMatic);
+                _distributeRewards(rec[i], msg.sender, false, _inMatic);
             }
             unchecked {
                 ++i;
             }
         }
 
-        // reset total allocation
+        // update distributor's total allocation to current share price
 
-        Allocation storage totalAllocation = totalAllocated[msg.sender][_strict];
+        Allocation storage totalAllocation = totalAllocated[msg.sender][false];
         totalAllocation.sharePriceNum = globalPriceNum;
         totalAllocation.sharePriceDenom = globalPriceDenom;
 
-        emit DistributedAll(_distributor, globalPriceNum, globalPriceDenom, _strict);
+        emit DistributedAll(msg.sender, globalPriceNum, globalPriceDenom);
     }
 
     // *** VAULT OWNER ADMIN SETTERS ***
@@ -957,17 +752,6 @@ contract TruStakeMATICv2 is
         defaultValidatorAddress = _validator;
     }
 
-    /// @notice Sets the maximum amount of staked MATIC above which users cannot call deposit.
-    /// @param _cap Must be larger than the total staked of the pool.
-    function setCap(uint256 _cap) external onlyOwner {
-        if (_cap < totalStaked()) {
-            revert CapTooLow();
-        }
-        //check for cap too high as well/instead?
-        emit SetCap(cap, _cap);
-        cap = _cap;
-    }
-
     /// @notice Sets the fee on certain actions within the protocol.
     /// @param _phi New fee cannot be larger than phi precision.
     function setPhi(uint256 _phi) external onlyOwner {
@@ -978,7 +762,7 @@ contract TruStakeMATICv2 is
         phi = _phi;
     }
 
-    /// @notice Sets the distribution fee for loose distributions.
+    /// @notice Sets the distribution fee.
     /// @param _distPhi New distribution fee.
     function setDistPhi(uint256 _distPhi) external onlyOwner {
         if (_distPhi > PHI_PRECISION) {
@@ -998,13 +782,6 @@ contract TruStakeMATICv2 is
         epsilon = _epsilon;
     }
 
-    /// @notice Determines whether strict allocations are allowed.
-    /// @param _allowStrict A value indicating whether the protocol allows strict allocations.
-    function setAllowStrict(bool _allowStrict) external onlyOwner {
-        emit SetAllowStrict(allowStrict, _allowStrict);
-        allowStrict = _allowStrict;
-    }
-
     /// @notice Sets the lower deposit limit.
     /// @param _newMinDeposit New minimum amount of MATIC one has to deposit (default 1e18 = 1 MATIC).
     function setMinDeposit(uint256 _newMinDeposit) external onlyOwner {
@@ -1017,8 +794,8 @@ contract TruStakeMATICv2 is
 
     /// @notice Adds a new validator to the list of validators supported by the Staker.
     /// @param _validator The share contract address of the validator to add.
-    /// @dev Newly added validators are considered enabled by defaut.
-    /// This function reverts when a validator with the same share contract address already exists.
+    /// @dev Newly added validators are considered enabled by default.
+    /// @dev This function reverts when a validator with the same share contract address already exists.
     function addValidator(address _validator) external onlyOwner {
         _checkNotZeroAddress(_validator);
 
@@ -1027,9 +804,12 @@ contract TruStakeMATICv2 is
         }
 
         validatorAddresses.push(_validator);
-        validators[_validator].state = ValidatorState.ENABLED;
 
-         emit ValidatorAdded(_validator);
+        (uint256 stakedAmount,) = IValidatorShare(_validator).getTotalStake(address(this));
+        validators[_validator].state = ValidatorState.ENABLED;
+        validators[_validator].stakedAmount = stakedAmount;
+
+        emit ValidatorAdded(_validator, stakedAmount);
     }
 
     /// @notice Disable an enabled validator to prevent depositing and staking to it.
@@ -1071,10 +851,6 @@ contract TruStakeMATICv2 is
             revert DepositBelowMinDeposit();
         }
 
-        if (_amount > maxDeposit(_user)) {
-            revert DepositSurpassesVaultCap();
-        }
-
         if (validators[_validator].state != ValidatorState.ENABLED) {
             revert ValidatorNotEnabled();
         }
@@ -1086,7 +862,8 @@ contract TruStakeMATICv2 is
         uint256 shareIncreaseTsy = (totalRewards() * phi * 1e18 * globalPriceDenom) / (globalPriceNum * PHI_PRECISION);
 
         // piggyback previous withdrawn rewards in this staking call
-        uint256 stakeAmount = _amount + totalAssets();
+        uint256 totalAssetBalance = totalAssets();
+        uint256 stakeAmount = _amount + totalAssetBalance;
         // adjust share balances
         if (_user != address(0)) {
             _mint(_user, shareIncreaseUser);
@@ -1109,7 +886,7 @@ contract TruStakeMATICv2 is
         // claimed rewards increase here as liquid rewards on validator share contract
         // are set to zero rewards and transferred to this vault
 
-        emit Deposited(_user, shareIncreaseTsy, shareIncreaseUser, _amount, stakeAmount, totalAssets(), _validator);
+        emit Deposited(_user, shareIncreaseTsy, shareIncreaseUser, _amount, stakeAmount, totalAssetBalance, _validator);
     }
 
     /// @notice Internal function to handle withdrawals and burning shares.
@@ -1178,16 +955,12 @@ contract TruStakeMATICv2 is
         // if the nonce is linked to a withdrawal in the current mapping, use that
         if(withdrawal.user != address(0)){
             delete withdrawals[_validator][_unbondNonce];
-        }
-
-        // else if the claim is for the twinstake staker, check the legacy mapping for the withdrawal
-        else if(_validator == 0xeA077b10A0eD33e4F68Edb2655C18FDA38F84712 && unbondingWithdrawals[_unbondNonce].user != address(0) ){
+        } else if(_validator == 0xeA077b10A0eD33e4F68Edb2655C18FDA38F84712 && unbondingWithdrawals[_unbondNonce].user != address(0)) {
+            // else if the claim is for the twinstake staker, check the legacy mapping for the withdrawal
             withdrawal = unbondingWithdrawals[_unbondNonce];
             delete unbondingWithdrawals[_unbondNonce];
-        }
-
-        // else withdraw claim does not exist
-        else{
+        } else{
+             // else withdraw claim does not exist
             revert WithdrawClaimNonExistent();
         }
 
@@ -1209,18 +982,17 @@ contract TruStakeMATICv2 is
     /// @param _amount Amount of MATIC to stake.
     /// @param _validator Address of the validator to stake with.
     function _stake(uint256 _amount, address _validator) private {
-        IValidatorShare(_validator).buyVoucher(_amount, _amount);
         validators[_validator].stakedAmount += _amount;
+        IValidatorShare(_validator).buyVoucher(_amount, _amount);
     }
 
     /// @notice Requests to unstake a certain amount of MATIC from the default validator.
     /// @param _amount Amount of MATIC to initiate the unstaking of.
     /// @param _validator Address of the validator to unstake from.
-    function _unbond(uint256 _amount, address _validator) private returns (uint256 unbondNonce) {
-        IValidatorShare(_validator).sellVoucher_new(_amount, _amount);
-
-        unbondNonce = IValidatorShare(_validator).unbondNonces(address(this));
+    function _unbond(uint256 _amount, address _validator) private returns (uint256) {
         validators[_validator].stakedAmount -= _amount;
+        IValidatorShare(_validator).sellVoucher_new(_amount, _amount);
+        return IValidatorShare(_validator).unbondNonces(address(this));
     }
 
     /// @notice Internal function for claiming the MATIC from a withdrawal request made previously.
@@ -1230,26 +1002,38 @@ contract TruStakeMATICv2 is
         IValidatorShare(_validator).unstakeClaimTokens_new(_unbondNonce);
     }
 
-    /// @notice Calls the validator share contract's restake functionality to turn earned rewards into staked MATIC.
-    /// @param _validator Address of the validator to restake.
-    function _restake(address _validator) private {
-        IValidatorShare(_validator).restake();
-        //TODO: update validator mapping
+    /// @notice Calls the validator share contract's restake functionality on all enabled validators
+    /// to turn earned rewards into staked MATIC.
+    /// @dev Logs a RestakeError event when an exception occurs while calling restake on a validator.
+    function _restake() private {
+        uint256 validatorCount = validatorAddresses.length;
+        for (uint256 i; i < validatorCount;){
+            address validator = validatorAddresses[i];
+            if (validators[validator].state == ValidatorState.ENABLED) {
+                // log an event on "Too small rewards to restake" and other exceptions
+                try IValidatorShare(validator).restake() {} catch Error(string memory reason) {
+                    emit RestakeError(validator, reason);
+                }
+            }
+
+            unchecked {
+                ++i;
+            }
+        }
     }
 
     /// @notice Private function called upon distribute rewards calls.
     /// @dev Also updates share price accordingly.
     /// @param _recipient The receiver of the distributed rewards.
     /// @param _distributor The person sending the rewards.
-    /// @param _strict A value indicating whether the type of the allocation is strict(true) or loose(false).
     /// @param _inMatic A value indicating whether the rewards are in MATIC.
-    function _distributeRewardsUpdateTotal(address _recipient, address _distributor, bool _strict, bool _inMatic) private {
-        Allocation storage individualAllocation = allocations[_distributor][_recipient][_strict];
+    function _distributeRewardsUpdateTotal(address _recipient, address _distributor, bool _inMatic) private {
+        Allocation storage individualAllocation = allocations[_distributor][_recipient][false];
 
         if (individualAllocation.maticAmount == 0) {
             revert NothingToDistribute();
         }
-        Allocation storage totalAllocation = totalAllocated[_distributor][_strict];
+        Allocation storage totalAllocation = totalAllocated[_distributor][false];
         // moved up for stack too deep issues
         (uint256 globalPriceNum, uint256 globalPriceDenom) = sharePrice();
 
@@ -1267,11 +1051,10 @@ contract TruStakeMATICv2 is
         uint256 oldIndividualSharePriceNum;
         uint256 oldIndividualSharePriceDenom;
 
-        // dist rewards private fn, which does not update total allocated
+        // distribute rewards private fn, which does not update total allocated
         (oldIndividualSharePriceNum, oldIndividualSharePriceDenom, sharesDistributed) = _distributeRewards(
             _recipient,
             _distributor,
-            _strict,
             true,
             _inMatic
         );
@@ -1307,7 +1090,7 @@ contract TruStakeMATICv2 is
         totalAllocation.sharePriceDenom = newTotalAllocationSharePriceDenom;
 
         // rounding total allocated share price denominator UP, in order to minimise the total allocation share price
-        // which maximises the amount owed by the distributor, which they cannot withdraw/transfer (strict allocations)
+        // which maximises the amount owed by the distributor
 
         emit DistributedRewards(
             _distributor,
@@ -1317,25 +1100,22 @@ contract TruStakeMATICv2 is
             globalPriceNum,
             globalPriceDenom,
             totalAllocationSharePriceNum,
-            newTotalAllocationSharePriceDenom,
-            _strict
+            newTotalAllocationSharePriceDenom
         );
     }
 
     /// @notice Distributes the rewards related to the allocation made to that receiver.
     /// @param _recipient Receives the rewards.
     /// @param _distributor Distributes their rewards.
-    /// @param _strict A value indicating whether the type of the allocation is strict(true) or loose(false).
     /// @param _individual A value indicating whether this function is called within distributeRewards(true) or distributeAll(false).
     /// @param _inMatic A value indicating whether rewards are in MATIC.
     function _distributeRewards(
         address _recipient,
         address _distributor,
-        bool _strict,
         bool _individual,
         bool _inMatic
     ) private returns (uint256, uint256, uint256) {
-        Allocation storage individualAllocation = allocations[_distributor][_recipient][_strict];
+        Allocation storage individualAllocation = allocations[_distributor][_recipient][false];
         uint256 amt = individualAllocation.maticAmount;
 
         (uint256 globalPriceNum, uint256 globalPriceDenom) = sharePrice();
@@ -1345,21 +1125,17 @@ contract TruStakeMATICv2 is
         uint256 sharesToMove;
 
         {
-            uint256 totalShares = MathUpgradeable.mulDiv(amt, individualAllocation.sharePriceDenom * 1e18, individualAllocation.sharePriceNum, MathUpgradeable.Rounding.Down) -
+            sharesToMove = MathUpgradeable.mulDiv(amt, individualAllocation.sharePriceDenom * 1e18, individualAllocation.sharePriceNum, MathUpgradeable.Rounding.Down) -
                 MathUpgradeable.mulDiv(amt, globalPriceDenom * 1e18, globalPriceNum, MathUpgradeable.Rounding.Up);
 
-            if (!_strict) {
-                // calc fees and transfer
 
-                uint256 fee = (totalShares * distPhi) / PHI_PRECISION;
+            // calculate fees and transfer
 
-                sharesToMove = totalShares - fee;
+            uint256 fee = (sharesToMove * distPhi) / PHI_PRECISION;
 
-                // Use parent _transfer function to bypass strict allocation share lock
-                super._transfer(_distributor, treasuryAddress, fee);
-            } else {
-                sharesToMove = totalShares;
-            }
+            sharesToMove -= fee;
+
+            _transfer(_distributor, treasuryAddress, fee);
         }
 
         if (_inMatic) {
@@ -1367,8 +1143,7 @@ contract TruStakeMATICv2 is
             // transfer staking token from distributor to recipient
             IERC20Upgradeable(stakingTokenAddress).safeTransferFrom(_distributor, _recipient, maticAmount);
         } else {
-            // Use parent _transfer function to bypass strict allocation share lock
-            super._transfer(_distributor, _recipient, sharesToMove);
+            _transfer(_distributor, _recipient, sharesToMove);
         }
 
         (uint256 oldNum, uint256 oldDenom) = (individualAllocation.sharePriceNum, individualAllocation.sharePriceDenom);
@@ -1384,8 +1159,7 @@ contract TruStakeMATICv2 is
                 globalPriceNum,
                 globalPriceDenom,
                 0,
-                0,
-                _strict
+                0
             );
         }
 
@@ -1431,30 +1205,19 @@ contract TruStakeMATICv2 is
     function _convertToShares(
         uint256 assets,
         MathUpgradeable.Rounding rounding
-    ) internal view override returns (uint256 shares) {
+    ) internal view override returns (uint256) {
         (uint256 globalPriceNum, uint256 globalPriceDenom) = sharePrice();
-        shares =  MathUpgradeable.mulDiv(assets * 1e18, globalPriceDenom, globalPriceNum, rounding);
+        return MathUpgradeable.mulDiv(assets * 1e18, globalPriceDenom, globalPriceNum, rounding);
     }
 
-    /// @notice internal function to convert TruMATIC to MATIC.
+    /// @notice Internal function to convert TruMATIC to MATIC.
     /// @dev Method overrides an ERC-4626 method and is used in ERC-4626 functions like the public convertToAssets.
     /// @param shares TruMATIC shares to be converted into MATIC.
     function _convertToAssets(
         uint256 shares,
         MathUpgradeable.Rounding rounding
-    ) internal view override returns (uint256 assets) {
+    ) internal view override returns (uint256) {
         (uint256 globalPriceNum, uint256 globalPriceDenom) = sharePrice();
-        assets = MathUpgradeable.mulDiv(shares, globalPriceNum, globalPriceDenom * 1e18, rounding);
+        return MathUpgradeable.mulDiv(shares, globalPriceNum, globalPriceDenom * 1e18, rounding);
     }
-
-    // We override this function as we want to block users from transferring strict allocations and associated rewards.
-    // We avoid using the _beforeTokenTransfer hook as we wish to utilise unblocked super._transfer functionality in reward distribution.
-    function _transfer(address from, address to, uint256 amount) internal override {
-        if (from != address(0) && amount > maxRedeem(from)) {
-            revert ExceedsUnallocatedBalance();
-        }
-
-        super._transfer(from, to, amount);
-    }
-
 }

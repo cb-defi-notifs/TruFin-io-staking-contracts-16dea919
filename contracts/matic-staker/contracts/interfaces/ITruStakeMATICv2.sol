@@ -16,7 +16,6 @@ interface ITruStakeMATICv2 {
         address _whitelistAddress,
         address _treasuryAddress,
         uint256 _phi,
-        uint256 _cap,
         uint256 _distPhi
     );
 
@@ -99,8 +98,6 @@ interface ITruStakeMATICv2 {
     /// @param _totalAmount Total amount distributor has allocated.
     /// @param _totalNum Average share price numerator at which distributor allocated.
     /// @param _totalDenom Average share price denominator at which distributor allocated.
-    /// @param _strict Boolean to determine whether deallocation of funds allocated here should
-    /// be subject to checks or not.
     event Allocated(
         address indexed _distributor,
         address indexed _recipient,
@@ -109,8 +106,7 @@ interface ITruStakeMATICv2 {
         uint256 _individualDenom,
         uint256 _totalAmount,
         uint256 _totalNum,
-        uint256 _totalDenom,
-        bool indexed _strict
+        uint256 _totalDenom
     );
 
     /// @notice Emitted on deallocations.
@@ -120,32 +116,13 @@ interface ITruStakeMATICv2 {
     /// @param _totalAmount Total amount distributor has allocated.
     /// @param _totalNum Average share price numerator at which distributor allocated.
     /// @param _totalDenom Average share price denominator at which distributor allocated.
-    /// @param _strict Boolean to determine whether the deallocation of these funds was
-    /// subject to strictness checks or not.
     event Deallocated(
         address indexed _distributor,
         address indexed _recipient,
         uint256 _individualAmount,
         uint256 _totalAmount,
         uint256 _totalNum,
-        uint256 _totalDenom,
-        bool indexed _strict
-    );
-
-    /// @notice Emitted on reallocations.
-    /// @param _distributor Address of user who is switching allocation recipient.
-    /// @param _oldRecipient Previous recipient of allocated rewards.
-    /// @param _newRecipient New recipient of allocated rewards.
-    /// @param _newAmount MATIC amount stored in allocation of the new recipient.
-    /// @param _newNum Numerator of share price stored in allocation of the new recipient.
-    /// @param _newDenom Denominator of share price stored in allocation of the new recipient.
-    event Reallocated(
-        address indexed _distributor,
-        address indexed _oldRecipient,
-        address indexed _newRecipient,
-        uint256 _newAmount,
-        uint256 _newNum,
-        uint256 _newDenom
+        uint256 _totalDenom
     );
 
     /// @notice Emitted when rewards are distributed.
@@ -157,8 +134,6 @@ interface ITruStakeMATICv2 {
     /// @param _individualDenom Average share price numerator at which distributor allocated.
     /// @param _totalNum Average share price numerator at which distributor allocated.
     /// @param _totalDenom Average share price denominator at which distributor allocated.
-    /// @param _strict Bool to determine whether these funds came from the strict or
-    /// non-strict allocation mappings.
     event DistributedRewards(
         address indexed _distributor,
         address indexed _recipient,
@@ -167,17 +142,14 @@ interface ITruStakeMATICv2 {
         uint256 _individualNum,
         uint256 _individualDenom,
         uint256 _totalNum,
-        uint256 _totalDenom,
-        bool indexed _strict
+        uint256 _totalDenom
     );
 
     /// @notice Emitted when rewards are distributed.
     /// @param _distributor Address of user who has allocated to someone else.
     /// @param _curNum Current share price numerator.
     /// @param _curDenom Current share price denominator.
-    /// @param _strict Bool to determine whether these funds came from the strict or
-    /// non-strict allocation mappings.
-    event DistributedAll(address indexed _distributor, uint256 _curNum, uint256 _curDenom, bool indexed _strict);
+    event DistributedAll(address indexed _distributor, uint256 _curNum, uint256 _curDenom);
 
     // Setter Tracking
 
@@ -187,24 +159,25 @@ interface ITruStakeMATICv2 {
 
     event SetDefaultValidator(address indexed _oldDefaultValidator, address indexed _newDefaultValidator);
 
-    event SetCap(uint256 indexed _oldCap, uint256 indexed _newCap);
-
     event SetPhi(uint256 indexed _oldPhi, uint256 indexed _newPhi);
 
     event SetDistPhi(uint256 indexed _oldDistPhi, uint256 indexed _newDistPhi);
 
     event SetEpsilon(uint256 indexed _oldEpsilon, uint256 indexed _newEpsilon);
 
-    event SetAllowStrict(bool indexed _oldAllowStrict, bool indexed _newAllowStrict);
-
     event SetMinDeposit(uint256 indexed _oldMinDeposit, uint256 indexed _newMinDeposit);
 
-    event ValidatorAdded(address indexed _validator);
+    event ValidatorAdded(address indexed _validator, uint256 _stakedAmount);
 
     event ValidatorStateChanged(
         address indexed _validator,
         ValidatorState indexed _oldState,
         ValidatorState indexed _newState
+    );
+
+    event RestakeError(
+        address indexed _validator,
+        string _reason
     );
 
     // --- Errors ---
@@ -223,9 +196,6 @@ interface ITruStakeMATICv2 {
     /// @notice Error thrown when a user tries to deposit less than the minimum deposit amount.
     error DepositBelowMinDeposit();
 
-    /// @notice Error thrown when a deposit causes the vault staked amount to surpass the cap.
-    error DepositSurpassesVaultCap();
-
     /// @notice Error thrown when a user tries to request a withdrawal with an amount larger
     /// than their shares entitle them to.
     error WithdrawalAmountTooLarge();
@@ -239,10 +209,6 @@ interface ITruStakeMATICv2 {
     /// @notice Error thrown when a user tries to claim a withdrawal that does not exist.
     error WithdrawClaimNonExistent();
 
-    /// @notice Error thrown when a user tries to strictly allocate but `allowStrict`
-    /// has been set to false.
-    error StrictAllocationDisabled();
-
     /// @notice Error thrown when user allocates more MATIC than available.
     error InsufficientDistributorBalance();
 
@@ -252,30 +218,16 @@ interface ITruStakeMATICv2 {
     /// @notice Error thrown when deallocation is greater than allocated amount.
     error ExcessDeallocation();
 
-    /// @notice Error thrown when a user tries to reallocate or deallocate from a user they do
+    /// @notice Error thrown when a user tries to deallocate from a user they do
     /// not currently have anything allocated to.
     error AllocationNonExistent();
-
-    /// @notice Error thrown when user attempts to reallocate to the initial recipient.
-    error AllocationToInitialRecipient();
 
     /// @notice Error thrown when user calls distributeRewards when the allocation
     /// share price is the same as the current share price.
     error NothingToDistribute();
 
-    /// @notice Error thrown when a user tries to a distribute rewards allocated by
-    /// a different user.
-    error OnlyDistributorCanDistributeRewards();
-
-    /// @notice Error thrown when a user tries to transfer more share than their
-    /// balance subtracted by the total amount they have strictly allocated.
-    error ExceedsUnallocatedBalance();
-
     /// @notice Error thrown when the distribution fee is higher than the fee precision.
     error DistPhiTooLarge();
-
-    /// @notice Error thrown when new cap is less than current amount staked.
-    error CapTooLow();
 
     /// @notice Error thrown when epsilon is set too high.
     error EpsilonTooLarge();

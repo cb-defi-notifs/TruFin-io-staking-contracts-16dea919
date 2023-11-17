@@ -14,7 +14,7 @@ struct Withdrawal {
 
 /// @notice Struct to hold information on user allocations.
 /// @dev The numerator and denominator update when the allocation amount increases,
-/// decreases (only for strict allocations) or when a distribution occurs.
+/// or when a distribution occurs.
 /// @param maticAmount the amount of MATIC allocated.
 /// @param sharePriceNum numerator of the share price for this allocation.
 /// @param sharePriceDenom denominator of the share price for this allocation.
@@ -32,7 +32,7 @@ struct Validator {
     ValidatorState state;
     uint256 stakedAmount;
     address validatorAddress;
-    }
+}
 
 /// @notice Enum for the possible validator states.
 enum ValidatorState {

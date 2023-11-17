@@ -11,27 +11,12 @@
   },
   {
     "inputs": [],
-    "name": "AllocationToInitialRecipient",
-    "type": "error"
-  },
-  {
-    "inputs": [],
     "name": "AllocationUnderOneMATIC",
     "type": "error"
   },
   {
     "inputs": [],
-    "name": "CapTooLow",
-    "type": "error"
-  },
-  {
-    "inputs": [],
     "name": "DepositBelowMinDeposit",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "DepositSurpassesVaultCap",
     "type": "error"
   },
   {
@@ -42,11 +27,6 @@
   {
     "inputs": [],
     "name": "EpsilonTooLarge",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "ExceedsUnallocatedBalance",
     "type": "error"
   },
   {
@@ -71,11 +51,6 @@
   },
   {
     "inputs": [],
-    "name": "OnlyDistributorCanDistributeRewards",
-    "type": "error"
-  },
-  {
-    "inputs": [],
     "name": "PhiTooLarge",
     "type": "error"
   },
@@ -87,11 +62,6 @@
   {
     "inputs": [],
     "name": "SenderMustHaveInitiatedWithdrawalRequest",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "StrictAllocationDisabled",
     "type": "error"
   },
   {
@@ -189,12 +159,6 @@
         "internalType": "uint256",
         "name": "_totalDenom",
         "type": "uint256"
-      },
-      {
-        "indexed": true,
-        "internalType": "bool",
-        "name": "_strict",
-        "type": "bool"
       }
     ],
     "name": "Allocated",
@@ -263,12 +227,6 @@
         "internalType": "uint256",
         "name": "_totalDenom",
         "type": "uint256"
-      },
-      {
-        "indexed": true,
-        "internalType": "bool",
-        "name": "_strict",
-        "type": "bool"
       }
     ],
     "name": "Deallocated",
@@ -374,12 +332,6 @@
         "internalType": "uint256",
         "name": "_curDenom",
         "type": "uint256"
-      },
-      {
-        "indexed": true,
-        "internalType": "bool",
-        "name": "_strict",
-        "type": "bool"
       }
     ],
     "name": "DistributedAll",
@@ -435,12 +387,6 @@
         "internalType": "uint256",
         "name": "_totalDenom",
         "type": "uint256"
-      },
-      {
-        "indexed": true,
-        "internalType": "bool",
-        "name": "_strict",
-        "type": "bool"
       }
     ],
     "name": "DistributedRewards",
@@ -484,41 +430,17 @@
       {
         "indexed": true,
         "internalType": "address",
-        "name": "_distributor",
-        "type": "address"
-      },
-      {
-        "indexed": true,
-        "internalType": "address",
-        "name": "_oldRecipient",
-        "type": "address"
-      },
-      {
-        "indexed": true,
-        "internalType": "address",
-        "name": "_newRecipient",
+        "name": "_validator",
         "type": "address"
       },
       {
         "indexed": false,
-        "internalType": "uint256",
-        "name": "_newAmount",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "_newNum",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "_newDenom",
-        "type": "uint256"
+        "internalType": "string",
+        "name": "_reason",
+        "type": "string"
       }
     ],
-    "name": "Reallocated",
+    "name": "RestakeError",
     "type": "event"
   },
   {
@@ -538,44 +460,6 @@
       }
     ],
     "name": "RewardsCompounded",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "bool",
-        "name": "_oldAllowStrict",
-        "type": "bool"
-      },
-      {
-        "indexed": true,
-        "internalType": "bool",
-        "name": "_newAllowStrict",
-        "type": "bool"
-      }
-    ],
-    "name": "SetAllowStrict",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "uint256",
-        "name": "_oldCap",
-        "type": "uint256"
-      },
-      {
-        "indexed": true,
-        "internalType": "uint256",
-        "name": "_newCap",
-        "type": "uint256"
-      }
-    ],
-    "name": "SetCap",
     "type": "event"
   },
   {
@@ -753,12 +637,6 @@
       {
         "indexed": false,
         "internalType": "uint256",
-        "name": "_cap",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
         "name": "_distPhi",
         "type": "uint256"
       }
@@ -799,6 +677,12 @@
         "internalType": "address",
         "name": "_validator",
         "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "_stakedAmount",
+        "type": "uint256"
       }
     ],
     "name": "ValidatorAdded",
@@ -976,11 +860,6 @@
         "internalType": "address",
         "name": "_recipient",
         "type": "address"
-      },
-      {
-        "internalType": "bool",
-        "name": "_strict",
-        "type": "bool"
       }
     ],
     "name": "allocate",
@@ -1022,19 +901,6 @@
         "internalType": "uint256",
         "name": "sharePriceDenom",
         "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "allowStrict",
-    "outputs": [
-      {
-        "internalType": "bool",
-        "name": "",
-        "type": "bool"
       }
     ],
     "stateMutability": "view",
@@ -1121,19 +987,6 @@
     "type": "function"
   },
   {
-    "inputs": [],
-    "name": "cap",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
     "inputs": [
       {
         "internalType": "uint256[]",
@@ -1152,7 +1005,13 @@
     "type": "function"
   },
   {
-    "inputs": [],
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_validator",
+        "type": "address"
+      }
+    ],
     "name": "compoundRewards",
     "outputs": [],
     "stateMutability": "nonpayable",
@@ -1207,11 +1066,6 @@
         "internalType": "address",
         "name": "_recipient",
         "type": "address"
-      },
-      {
-        "internalType": "bool",
-        "name": "_strict",
-        "type": "bool"
       }
     ],
     "name": "deallocate",
@@ -1318,6 +1172,32 @@
     "type": "function"
   },
   {
+    "inputs": [],
+    "name": "deprecated1",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "deprecated2",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
     "inputs": [
       {
         "internalType": "address",
@@ -1346,16 +1226,6 @@
   {
     "inputs": [
       {
-        "internalType": "address",
-        "name": "_distributor",
-        "type": "address"
-      },
-      {
-        "internalType": "bool",
-        "name": "_strict",
-        "type": "bool"
-      },
-      {
         "internalType": "bool",
         "name": "_inMatic",
         "type": "bool"
@@ -1372,16 +1242,6 @@
         "internalType": "address",
         "name": "_recipient",
         "type": "address"
-      },
-      {
-        "internalType": "address",
-        "name": "_distributor",
-        "type": "address"
-      },
-      {
-        "internalType": "bool",
-        "name": "_strict",
-        "type": "bool"
       },
       {
         "internalType": "bool",
@@ -1498,11 +1358,6 @@
         "internalType": "address",
         "name": "_user",
         "type": "address"
-      },
-      {
-        "internalType": "bool",
-        "name": "_strict",
-        "type": "bool"
       }
     ],
     "name": "getDistributors",
@@ -1535,11 +1390,6 @@
         "internalType": "address",
         "name": "_user",
         "type": "address"
-      },
-      {
-        "internalType": "bool",
-        "name": "_strict",
-        "type": "bool"
       }
     ],
     "name": "getRecipients",
@@ -1703,11 +1553,6 @@
         "internalType": "uint256",
         "name": "_distPhi",
         "type": "uint256"
-      },
-      {
-        "internalType": "uint256",
-        "name": "_cap",
-        "type": "uint256"
       }
     ],
     "name": "initialize",
@@ -1781,7 +1626,7 @@
     "inputs": [
       {
         "internalType": "address",
-        "name": "_user",
+        "name": "owner",
         "type": "address"
       }
     ],
@@ -1842,35 +1687,6 @@
       }
     ],
     "name": "mint",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "_shares",
-        "type": "uint256"
-      },
-      {
-        "internalType": "address",
-        "name": "_receiver",
-        "type": "address"
-      },
-      {
-        "internalType": "address",
-        "name": "_validator",
-        "type": "address"
-      }
-    ],
-    "name": "mintFromSpecificValidator",
     "outputs": [
       {
         "internalType": "uint256",
@@ -2000,24 +1816,6 @@
     "inputs": [
       {
         "internalType": "address",
-        "name": "_oldRecipient",
-        "type": "address"
-      },
-      {
-        "internalType": "address",
-        "name": "_newRecipient",
-        "type": "address"
-      }
-    ],
-    "name": "reallocate",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
         "name": "",
         "type": "address"
       },
@@ -2075,32 +1873,6 @@
   {
     "inputs": [],
     "name": "renounceOwnership",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "bool",
-        "name": "_allowStrict",
-        "type": "bool"
-      }
-    ],
-    "name": "setAllowStrict",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "_cap",
-        "type": "uint256"
-      }
-    ],
-    "name": "setCap",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -2215,19 +1987,6 @@
     "type": "function"
   },
   {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "_validator",
-        "type": "address"
-      }
-    ],
-    "name": "stakeClaimedRewards",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
     "inputs": [],
     "name": "stakeManagerContractAddress",
     "outputs": [
@@ -2319,7 +2078,7 @@
     "outputs": [
       {
         "internalType": "uint256",
-        "name": "validatorRewards",
+        "name": "",
         "type": "uint256"
       }
     ],
@@ -2332,7 +2091,7 @@
     "outputs": [
       {
         "internalType": "uint256",
-        "name": "stake",
+        "name": "",
         "type": "uint256"
       }
     ],

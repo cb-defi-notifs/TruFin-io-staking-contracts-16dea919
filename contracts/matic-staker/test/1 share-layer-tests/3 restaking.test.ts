@@ -17,12 +17,12 @@ import {
 } from "../helpers/state-interaction";
 
 describe("RESTAKE", () => {
-  let deployer, treasury, one, token, stakeManager, validatorShare, staker;
+  let deployer, treasury, one, token, stakeManager, validatorShare, validatorShare2, staker;
 
   beforeEach(async () => {
     // reset to fixture
     ({
-      deployer, treasury, one, token, stakeManager, validatorShare, staker
+      deployer, treasury, one, token, stakeManager, validatorShare, validatorShare2, staker
     } = await loadFixture(deployment));
   });
 
@@ -31,17 +31,17 @@ describe("RESTAKE", () => {
       // already checked rewards are zero immediately after deposit
       await staker
         .connect(one)
-       .deposit(parseEther(10000000), one.address);
+        .deposit(parseEther(10000000), one.address);
 
-      for(let i = 0; i < 5; i++){
-      // simulate passing checkpoint
-      await submitCheckpoint(i);
+      for(let i = 0; i < 5; i++) {
+        // simulate passing checkpoint
+        await submitCheckpoint(i);
 
-      // check rewards have increased after checkpoint passes
-      expect(await staker.totalRewards()).to.be.greaterThan(0);
-      expect(divSharePrice(await staker.sharePrice())).to.be.greaterThan(
-        parseEther(1)
-      );
+        // check rewards have increased after checkpoint passes
+        expect(await staker.totalRewards()).to.be.greaterThan(0);
+        expect(divSharePrice(await staker.sharePrice())).to.be.greaterThan(
+          parseEther(1)
+        );
       }
     });
   });
@@ -104,7 +104,7 @@ describe("RESTAKE", () => {
       ).sub(totalShares);
 
       // call compound rewards
-      await staker.connect(deployer).compoundRewards();
+      await staker.connect(deployer).compoundRewards(validatorShare.address);
 
       // check vault values are as expected
       expect(await staker.totalStaked()).to.equal(
@@ -124,7 +124,7 @@ describe("RESTAKE", () => {
       expect(await staker.balanceOf(treasury.address)).to.equal(shareInc); // should have changed
     });
 
-    it("rewards compounded correctly (stakeClaimedRewards: using claimed rewards)", async () => {
+    it("rewards compounded correctly (compoundRewards: using claimed rewards)", async () => {
       // deposit some MATIC
       let depositAmt = parseEther(10e6);
       await staker
@@ -153,24 +153,146 @@ describe("RESTAKE", () => {
       expect(preStakeTotalStaked).to.equal(parseEther(10e6));
 
       // stake claimed rewards
-      await staker.connect(deployer).stakeClaimedRewards(validatorShare.address);
+      await staker.connect(deployer).compoundRewards(validatorShare.address);
 
       // check claimed and total rewards
-      expect(await staker.totalAssets()).to.equal(preStakeTotalRewards);
+      expect(await staker.totalAssets()).to.equal(parseEther(0));
       expect(await staker.totalRewards()).to.equal(parseEther(0));
       expect(await staker.totalStaked()).to.equal(
         preStakeTotalStaked.add(preStakeClaimedRewards)
       );
     });
 
-    it("try compounding rewards with rewards equal to zero", async () => {
-      await staker
-        .connect(one)
-        ["deposit(uint256,address)"](parseEther(10e6), one.address);
+    it("does not revert when compounding zero rewards", async () => {
+      expect(await staker.totalRewards()).to.equal(0);
 
       await expect(
-        staker.connect(deployer).compoundRewards()
-      ).to.be.revertedWith("Too small rewards to restake");
+        staker.connect(deployer).compoundRewards(validatorShare.address)
+      ).to.not.be.reverted;
+    });
+
+    it("emits an event when restaking on a validator reverts", async () => {
+      expect(await staker.totalRewards()).to.equal(0);
+
+      await expect(
+        staker.connect(deployer).compoundRewards(validatorShare.address)
+      ).to.emit(staker, "RestakeError").withArgs(validatorShare.address, "Too small rewards to restake");
+    });
+
+    it("stakes MATIC present in the vault with the selected validator", async () => {
+      // add a new validator
+      await staker.addValidator(validatorShare2.address);
+
+      // set some MATIC in the vault
+      const maticAmount = parseEther(1000);
+      await setTokenBalance(token, staker.address, maticAmount);
+
+      const [stakedBefore,] = await validatorShare2.getTotalStake(staker.address);
+      expect(stakedBefore).to.equal(0);
+
+      // call compoundRewards on the new validator
+      await staker.connect(deployer).compoundRewards(validatorShare2.address);
+
+      // verify all MATIC was sent to the new validator and is staked
+      const [stakedAfter,] = await validatorShare2.getTotalStake(staker.address);
+      expect (stakedAfter).is.equal(maticAmount);
+      expect(await token.balanceOf(staker.address)).is.equal(0);
+    });
+
+    it("reverts when the selected validator is disabled", async () => {
+      // add a new validator
+      await staker.addValidator(validatorShare2.address);
+      await staker.disableValidator(validatorShare2.address);
+
+      // set some MATIC in the vault
+      const maticAmount = parseEther(1000);
+      await setTokenBalance(token, staker.address, maticAmount);
+
+
+      await expect(staker.connect(deployer).compoundRewards(validatorShare2.address)).to.be.revertedWithCustomError(staker, "ValidatorNotEnabled");
+    });
+
+    it("does not revert when a non-specified validator is disabled", async () => {
+      await staker.disableValidator(validatorShare.address);
+
+      await expect(staker.connect(deployer).compoundRewards(validatorShare2.address)).to.not.be.reverted;
+    });
+
+    it("does not revert when MATIC in the vault is below the validator min amount", async () => {
+      // set MATIC in the vault below the validator min amount
+      const minAmount = await validatorShare.minAmount();
+      await setTokenBalance(token, staker.address, minAmount.div(2));
+
+      expect(await staker.totalAssets()).to.be.greaterThan(0)
+
+      await expect(
+        staker.connect(deployer).compoundRewards(validatorShare.address)
+      ).to.not.be.reverted;
+
+      expect(await staker.totalAssets()).to.equal(0);
+
+    });
+
+    it("leaves no MATIC in the vault when there are liquid rewards to restake", async () => {
+
+      // first deposit
+      await staker.connect(one).depositToSpecificValidator(parseEther(1e6), validatorShare.address);
+
+      // submit checkpoint to generate rewards
+      await submitCheckpoint(0);
+
+      // verify there is no MATIC in the vault
+      expect(await token.balanceOf(staker.address)).is.equal(0);
+
+      // second deposit
+      await staker.connect(one).depositToSpecificValidator(parseEther(1e6), validatorShare.address);
+
+      // verify the validator sent some MATIC to the vault
+      expect(await token.balanceOf(staker.address)).is.greaterThan(0);
+
+      // generate more rewards
+      await submitCheckpoint(1);
+
+      // compound rewards with MATIC in the vault and liquid rewards to restake
+      await staker.connect(deployer).compoundRewards(validatorShare.address);
+
+      // verify the MATIC in the vault was sent to the validator
+      expect(await token.balanceOf(staker.address)).is.equal(0);
+    });
+
+    it("restakes liquid rewards on multiple validators", async () => {
+      // add a second validator
+      await staker.addValidator(validatorShare2.address);
+
+      // stake on both validators
+      await staker.connect(one).depositToSpecificValidator(parseEther(1e6), validatorShare.address);
+      await staker.connect(one).depositToSpecificValidator(parseEther(2e6), validatorShare2.address);
+
+      const [stakeOnFirstValidatorAfterDeposit,] = await validatorShare.getTotalStake(staker.address);
+      const [stakeOnSecondValidatorAfterDeposit,] = await validatorShare2.getTotalStake(staker.address);
+
+      // submit checkpoint to generate rewards
+      await submitCheckpoint(0);
+
+      const rewardsOnFirstValidator = await validatorShare.getLiquidRewards(staker.address);
+      const rewardsOnSecondValidator = await validatorShare2.getLiquidRewards(staker.address);
+
+      // verify rewards are present on both validators
+      expect(rewardsOnFirstValidator).to.be.greaterThan(0);
+      expect(rewardsOnSecondValidator).to.be.greaterThan(0);
+
+      // compound rewards on both validators
+      await staker.connect(deployer).compoundRewards(validatorShare.address);
+
+      // verity rewards got restaked on both validators
+      expect(await validatorShare.getLiquidRewards(staker.address)).to.equal(0);
+      expect(await validatorShare2.getLiquidRewards(staker.address)).to.equal(0);
+
+      const [stakeOnFirstValidator,] = await validatorShare.getTotalStake(staker.address);
+      const [stakeOnSecondValidator,] = await validatorShare2.getTotalStake(staker.address);
+
+      expect(stakeOnFirstValidator).to.equal(stakeOnFirstValidatorAfterDeposit.add(rewardsOnFirstValidator))
+      expect(stakeOnSecondValidator).to.equal(stakeOnSecondValidatorAfterDeposit.add(rewardsOnSecondValidator))
     });
   });
 });

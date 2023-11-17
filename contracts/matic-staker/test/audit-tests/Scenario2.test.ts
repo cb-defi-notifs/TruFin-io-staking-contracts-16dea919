@@ -44,10 +44,9 @@ const setTokenBalancesAndApprove = async (token, users, recipient, amount) => {
     }
 };
 
-describe("Scenario -- Check storage after allocate/deallocate/reallocate", () => {
+describe("Scenario -- Check storage after allocate/deallocate", () => {
     let deployer, treasury, user1, user2;
     let token, validatorShare, stakeManager, whitelist, staker;
-    let snapshot: any;
 
     before(async () => {
         // load deployed contracts
@@ -86,7 +85,6 @@ describe("Scenario -- Check storage after allocate/deallocate/reallocate", () =>
                     treasury.address,
                     constants.PHI,
                     constants.DIST_PHI,
-                    constants.CAP,
                 ])
             );
 
@@ -110,74 +108,61 @@ describe("Scenario -- Check storage after allocate/deallocate/reallocate", () =>
         });
 
         it(`Allocate user1 -> user2`, async () => {
-            await staker.connect(user1).allocate(parseEther("500"), user2.address, false);
+            await staker.connect(user1).allocate(parseEther("500"), user2.address);
             const sharePrice = await staker.sharePrice();
 
-            expect(await staker.getDistributors(user2.address, false)).to.deep.equal([user1.address]);
-            expect(await staker.getRecipients(user1.address, false)).to.deep.equal([user2.address]);
+            expect(await staker.getDistributors(user2.address)).to.deep.equal([user1.address]);
+            expect(await staker.getRecipients(user1.address)).to.deep.equal([user2.address]);
             expect(await staker.allocations(user1.address, user2.address, false)).to.deep.equal([parseEther("500"), sharePrice[0], sharePrice[1]]);
             expect(await staker.totalAllocated(user1.address, false)).to.deep.equal([parseEther("500"), sharePrice[0], sharePrice[1]]);
         });
 
         it(`Allocate user1 -> deployer`, async () => {
-            await staker.connect(user1).allocate(parseEther("500"), deployer.address, false);
+            await staker.connect(user1).allocate(parseEther("500"), deployer.address);
             const sharePrice = await staker.sharePrice();
 
-            expect(await staker.getDistributors(deployer.address, false)).to.deep.equal([user1.address]);
-            expect(await staker.getRecipients(user1.address, false)).to.deep.equal([user2.address, deployer.address]);
+            expect(await staker.getDistributors(deployer.address)).to.deep.equal([user1.address]);
+            expect(await staker.getRecipients(user1.address)).to.deep.equal([user2.address, deployer.address]);
             expect(await staker.allocations(user1.address, deployer.address, false)).to.deep.equal([parseEther("500"), sharePrice[0], sharePrice[1]]);
             expect(await staker.totalAllocated(user1.address, false)).to.deep.equal([parseEther("1000"), parseEther("10000000000000000000000000"), parseEther("10000000")]);
         });
 
         it(`Deallocate half user1 -> user2`, async () => {
-            await staker.connect(user1).deallocate(parseEther("250"), user2.address, false);
+            await staker.connect(user1).deallocate(parseEther("250"), user2.address);
             const sharePrice = await staker.sharePrice();
 
-            expect(await staker.getDistributors(user2.address, false)).to.deep.equal([user1.address]);
-            expect(await staker.getRecipients(user1.address, false)).to.deep.equal([user2.address, deployer.address]);
+            expect(await staker.getDistributors(user2.address)).to.deep.equal([user1.address]);
+            expect(await staker.getRecipients(user1.address)).to.deep.equal([user2.address, deployer.address]);
             expect(await staker.allocations(user1.address, user2.address, false)).to.deep.equal([parseEther("250"), sharePrice[0], sharePrice[1]]);
             expect(await staker.totalAllocated(user1.address, false)).to.deep.equal([parseEther("750"), parseEther("100000000000000000000000").mul(75), parseEther("7500000")]);
         });
 
         it(`Deallocate last half user1 -> user2`, async () => {
-            await staker.connect(user1).deallocate(parseEther("250"), user2.address, false);
+            await staker.connect(user1).deallocate(parseEther("250"), user2.address);
 
-            expect(await staker.getDistributors(user2.address, false)).to.deep.equal([]);
-            expect(await staker.getRecipients(user1.address, false)).to.deep.equal([deployer.address]);
+            expect(await staker.getDistributors(user2.address)).to.deep.equal([]);
+            expect(await staker.getRecipients(user1.address)).to.deep.equal([deployer.address]);
             expect(await staker.allocations(user1.address, user2.address, false)).to.deep.equal([0, 0, 0]);
             expect(await staker.totalAllocated(user1.address, false)).to.deep.equal([parseEther("500"), parseEther("10000000000000000000000000").div(2), parseEther("5000000")]);
         });
 
-        it(`Reallocate user1 (deployer -> user2)`, async () => {
-            await staker.connect(user1).reallocate(deployer.address, user2.address);
-            const sharePrice = await staker.sharePrice();
+        it(`Deallocate deployer`, async () => {
+          await staker.connect(user1).deallocate(parseEther("500"), deployer.address);
 
-            expect(await staker.getDistributors(user2.address, false)).to.deep.equal([user1.address]);
-            expect(await staker.getRecipients(user1.address, false)).to.deep.equal([user2.address]);
-            expect(await staker.allocations(user1.address, user2.address, false)).to.deep.equal([parseEther("500"), sharePrice[0], sharePrice[1]]);
-            expect(await staker.allocations(user1.address, deployer.address, false)).to.deep.equal([0, 0, 0]);
-            expect(await staker.totalAllocated(user1.address, false)).to.deep.equal([parseEther("500"), parseEther("10000000000000000000000000").div(2), parseEther("5000000")]);
+          expect(await staker.getDistributors(user2.address)).to.deep.equal([]);
+          expect(await staker.getRecipients(user1.address)).to.deep.equal([]);
+          expect(await staker.allocations(user1.address, user2.address, false)).to.deep.equal([0, 0, 0]);
+          expect(await staker.totalAllocated(user1.address, false)).to.deep.equal([0, 0, 0]);
         });
 
         it(`Allocate user1 -> deployer again`, async () => {
-            await staker.connect(user1).allocate(parseEther("250"), deployer.address, false);
+            await staker.connect(user1).allocate(parseEther("250"), deployer.address);
             const sharePrice = await staker.sharePrice();
 
-            expect(await staker.getDistributors(deployer.address, false)).to.deep.equal([user1.address]);
-            expect(await staker.getRecipients(user1.address, false)).to.deep.equal([user2.address, deployer.address]);
+            expect(await staker.getDistributors(deployer.address)).to.deep.equal([user1.address]);
+            expect(await staker.getRecipients(user1.address)).to.deep.equal([deployer.address]);
             expect(await staker.allocations(user1.address, deployer.address, false)).to.deep.equal([parseEther("250"), sharePrice[0], sharePrice[1]]);
-            expect(await staker.totalAllocated(user1.address, false)).to.deep.equal([parseEther("750"), parseEther("100000000000000000000000").mul(75), parseEther("7500000")]);
-        });
-
-        it(`Reallocate user1 (user2 -> deployer)`, async () => {
-            await staker.connect(user1).reallocate(user2.address, deployer.address);
-
-            expect(await staker.getDistributors(user2.address, false)).to.deep.equal([]);
-            expect(await staker.getDistributors(deployer.address, false)).to.deep.equal([user1.address]);
-            expect(await staker.getRecipients(user1.address, false)).to.deep.equal([deployer.address]);
-            expect(await staker.allocations(user1.address, user2.address, false)).to.deep.equal([0, 0, 0]);
-            expect(await staker.allocations(user1.address, deployer.address, false)).to.deep.equal([parseEther("750"), parseEther("100000000000000000000000").mul(75), parseEther("7500000")]);
-            expect(await staker.totalAllocated(user1.address, false)).to.deep.equal([parseEther("750"), parseEther("100000000000000000000000").mul(75), parseEther("7500000")]);
+            expect(await staker.totalAllocated(user1.address, false)).to.deep.equal([parseEther("250"), sharePrice[0], sharePrice[1]]);
         });
     });
 });

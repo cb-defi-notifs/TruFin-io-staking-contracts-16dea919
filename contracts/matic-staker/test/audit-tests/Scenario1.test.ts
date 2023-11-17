@@ -81,7 +81,6 @@ describe("Staker", () => {
                     treasury.address,
                     constants.PHI,
                     constants.DIST_PHI,
-                    constants.CAP,
                 ])
             );
 
@@ -114,8 +113,8 @@ describe("Staker", () => {
             await staker.connect(user2).deposit(amount, user2.address);
 
             // allocate
-            await staker.connect(user1).allocate(parseEther("100"), user2.address, false);
-            await staker.connect(user1).allocate(parseEther("400"), user2.address, false);
+            await staker.connect(user1).allocate(parseEther("100"), user2.address);
+            await staker.connect(user1).allocate(parseEther("400"), user2.address);
 
             await helpers.time.increase(10000000);
             await token.connect(user1).transfer(staker.address, parseEther("10"));
@@ -124,7 +123,7 @@ describe("Staker", () => {
 
             const user2SharesBalanceBefore = await staker.balanceOf(user2.address);
 
-            await staker.connect(user1).distributeRewards(user2.address, user1.address, false, false);
+            await staker.connect(user1).distributeRewards(user2.address, false);
 
             const user2SharesBalanceAfter = await staker.balanceOf(user2.address);
 

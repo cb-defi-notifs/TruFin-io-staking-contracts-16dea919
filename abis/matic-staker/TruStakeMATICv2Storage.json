@@ -40,12 +40,12 @@
   },
   {
     "inputs": [],
-    "name": "allowStrict",
+    "name": "defaultValidatorAddress",
     "outputs": [
       {
-        "internalType": "bool",
+        "internalType": "address",
         "name": "",
-        "type": "bool"
+        "type": "address"
       }
     ],
     "stateMutability": "view",
@@ -53,7 +53,7 @@
   },
   {
     "inputs": [],
-    "name": "cap",
+    "name": "deprecated1",
     "outputs": [
       {
         "internalType": "uint256",
@@ -66,12 +66,12 @@
   },
   {
     "inputs": [],
-    "name": "defaultValidatorAddress",
+    "name": "deprecated2",
     "outputs": [
       {
-        "internalType": "address",
+        "internalType": "bool",
         "name": "",
-        "type": "address"
+        "type": "bool"
       }
     ],
     "stateMutability": "view",

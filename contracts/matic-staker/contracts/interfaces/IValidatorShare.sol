@@ -13,19 +13,21 @@ interface IValidatorShare {
 
     function restake() external returns (uint256 amountRestaked, uint256 liquidReward);
 
-    function unbondNonces(address) external view returns (uint256); // automatically generated getter of a public mapping
+    function balanceOf(address account) external view returns (uint256);
 
-    function balanceOf(address) external view returns (uint256);
+    function approve(address spender, uint256 amount) external;
 
-    function approve(address, uint256) external;
+    function transfer(address to, uint256 value) external;
 
-    function transfer(address, uint256) external;
-
-    function transferFrom(address, address, uint256) external;
-
-    function unbonds_new(address, uint256) external view returns (uint256, uint256);
+    function transferFrom(address sender, address recipient, uint256 amount) external;
 
     function exchangeRate() external view returns (uint256);
 
-    function getTotalStake(address) external view returns (uint256, uint256);
+    function getTotalStake(address user) external view returns (uint256, uint256);
+
+    // automatically generated getter of a public mapping
+    function unbonds_new(address user, uint256 unbondNonce) external view returns (uint256, uint256);
+
+    // automatically generated getter of a public mapping
+    function unbondNonces(address user) external view returns (uint256);
 }

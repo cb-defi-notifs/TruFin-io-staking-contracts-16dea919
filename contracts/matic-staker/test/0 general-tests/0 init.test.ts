@@ -37,7 +37,7 @@ describe("INIT", () => {
       // todo: update this with new/all global vars
     });
 
-    it("validating initializer parameters", async () => {
+    it("reverts if phi is too large", async () => {
       await expect(
         ethers.getContractFactory("TruStakeMATICv2").then(
           (stakerFactory) => upgrades.deployProxy(stakerFactory, [
@@ -48,13 +48,27 @@ describe("INIT", () => {
             treasury.address,
             constants.PHI_PRECISION.add(1),
             constants.DIST_PHI,
-            constants.CAP
           ])
         )
       ).to.be.revertedWithCustomError(staker, "PhiTooLarge");
     });
-  });
 
+    it("reverts if distPhi is too large", async () => {
+      await expect(
+        ethers.getContractFactory("TruStakeMATICv2").then(
+          (stakerFactory) => upgrades.deployProxy(stakerFactory, [
+            token.address,
+            stakeManager.address,
+            validatorShare.address,
+            whitelist.address,
+            treasury.address,
+            constants.PHI,
+            constants.PHI_PRECISION.add(1),
+          ])
+        )
+      ).to.be.revertedWithCustomError(staker, "DistPhiTooLarge");
+    });
+  });
 
   describe("MODIFIERS", () => {
     it("onlyWhitelist", async () => {
@@ -97,16 +111,6 @@ describe("INIT", () => {
       ).to.be.revertedWith("Ownable: caller is not the owner");
     });
 
-    it("setCap", async () => {
-      expect(await staker.cap()).to.equal(constants.CAP);
-      await staker.connect(deployer).setCap(constants.CAP.mul(2));
-      expect(await staker.cap()).to.equal(constants.CAP.mul(2));
-
-      await expect(
-        staker.connect(one).setCap(constants.CAP.mul(2))
-      ).to.be.revertedWith("Ownable: caller is not the owner");
-    });
-
     it("setEpsilon", async () => {
       expect(await staker.epsilon()).to.equal(constants.EPSILON);
       await staker.connect(deployer).setEpsilon(constants.EPSILON.mul(2));
@@ -137,16 +141,6 @@ describe("INIT", () => {
       await expect(
         staker.connect(one).setDistPhi(constants.DIST_PHI.mul(2))
       ).to.be.revertedWith("Ownable: caller is not the owner");
-    });
-
-    it("owner sets allowStrict flag", async () => {
-      expect(await staker.allowStrict()).to.equal(false);
-      await staker.connect(deployer).setAllowStrict(true);
-      expect(await staker.allowStrict()).to.equal(true);
-    });
-
-    it("non-owner setting allowStrict flag fails", async () => {
-      await expect(staker.connect(one).setAllowStrict(false)).to.be.revertedWith("Ownable: caller is not the owner");
     });
 
     it("owner sets epsilon", async () => {

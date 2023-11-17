@@ -7,13 +7,14 @@ import * as constants from "../helpers/constants";
 import { deployment } from "../helpers/fixture";
 import { parseEther } from "../helpers/math";
 import { advanceEpochs } from "../helpers/state-interaction";
+import { smock } from '@defi-wonderland/smock';
 
 describe("WITHDRAW CLAIM", () => {
-  let one, two, token, stakeManager, staker, validatorShare, validatorShare2, deployer;
+  let one, two, nonWhitelistedUser, token, stakeManager, staker, validatorShare, validatorShare2, deployer;
 
   beforeEach(async () => {
     // reset to fixture
-    ({ one, two, token, stakeManager, staker, validatorShare, validatorShare2, deployer } = await loadFixture(deployment));
+    ({ one, two, nonWhitelistedUser, token, stakeManager, staker, validatorShare, validatorShare2, deployer } = await loadFixture(deployment));
   });
 
   describe("User: withdrawClaim", async () => {
@@ -51,6 +52,27 @@ describe("WITHDRAW CLAIM", () => {
       expect(usr).to.equal(one.address);
       expect(amt).to.equal(parseEther(3000));
     });
+
+    it("try claiming pre-upgrade withdrawal requested by different user", async () => {
+      // use old validator address
+      let oldValidator = "0xeA077b10A0eD33e4F68Edb2655C18FDA38F84712";
+
+      // mock staker contract and add a withdrawal to the old mapping for user 1
+      const stakerContractFactory = await smock.mock('TruStakeMATICv2');
+      const newStaker = await stakerContractFactory.deploy();
+      await newStaker.setVariable('unbondingWithdrawals', {
+        1: { user: one.address, amount: parseEther(123)}
+      });
+
+      // mock whitelist for onlyWhitelist modifier
+      let whitelist = await smock.fake(constants.WHITELIST_ABI);
+      whitelist.isUserWhitelisted.returns(true);
+      await newStaker.setVariable('whitelistAddress', whitelist.address);
+
+      // claim with user two
+      await expect(newStaker.connect(two).withdrawClaim(1, oldValidator)).to.be.revertedWithCustomError(staker, "SenderMustHaveInitiatedWithdrawalRequest");
+    });
+
 
     it("try claiming withdrawal requested 79 epochs ago", async () => {
       // advance by 79 epochs
@@ -90,6 +112,14 @@ describe("WITHDRAW CLAIM", () => {
       await expect(staker.connect(one).withdrawClaim(unbondNonce, validatorShare.address)).to.be.revertedWithCustomError(
         staker,
         "WithdrawClaimNonExistent"
+      );
+    });
+
+    it("try claiming withdrawal as non-whitelisted user", async () => {
+      // try claiming with a non-whitelisted user
+      await expect(staker.connect(nonWhitelistedUser).withdrawClaim(unbondNonce, validatorShare.address)).to.be.revertedWithCustomError(
+        staker,
+        "UserNotWhitelisted"
       );
     });
 
@@ -270,6 +300,11 @@ describe("WITHDRAW CLAIM", () => {
 
       // n1, n2, n3
       await expect(staker.connect(one).claimList([n1, n2, n3], validatorShare.address)).to.be.revertedWith("Incomplete withdrawal period");
+    });
+
+    it("try to claim test unbonds as a non-whitelisted user", async () => {
+      // n1, n2, n3
+      await expect(staker.connect(nonWhitelistedUser).claimList([n1, n2, n3], validatorShare.address)).to.be.revertedWithCustomError(staker, "UserNotWhitelisted");
     });
 
     it("try to claim test unbonds when one has already been claimed", async () => {

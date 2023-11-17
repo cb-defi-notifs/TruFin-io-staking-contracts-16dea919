@@ -8,7 +8,7 @@ import {IMasterWhitelist} from "../interfaces/IMasterWhitelist.sol";
 /// @title Master Whitelist
 /// @notice Contract that manages a whitelist of users.
 contract MasterWhitelist is OwnableUpgradeable, IMasterWhitelist {
-    /// @notice List of agents, who are in charge of managing the users whitelist.
+    /// @notice List of agents, who are in charge of managing the whitelist.
     mapping(address => bool) public agents;
 
     /// @notice Whitelist for users.

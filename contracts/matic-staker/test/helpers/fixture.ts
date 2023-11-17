@@ -31,7 +31,7 @@ export const deployment = async () => {
   );
 
   // load signers, balances set to 10k ETH in hardhat config file
-  const [deployer, treasury, one, two, three, four, five, six, seven] = await ethers.getSigners();
+  const [deployer, treasury, one, two, three, four, five, nonWhitelistedUser, seven] = await ethers.getSigners();
 
   // mock whitelist
   const whitelist = await smock.fake(constants.WHITELIST_ABI);
@@ -46,7 +46,6 @@ export const deployment = async () => {
     treasury.address,
     constants.PHI,
     constants.DIST_PHI,
-    constants.CAP
   ]);
 
 
@@ -56,7 +55,7 @@ export const deployment = async () => {
   // set each balance to 10M MATIC and approve it to staker
   await setTokenBalancesAndApprove(
     token,
-    [treasury, one, two, three, four, five, six],
+    [treasury, one, two, three, four, five, nonWhitelistedUser],
     staker.address,
     parseEther(10e6)
   );
@@ -67,7 +66,7 @@ export const deployment = async () => {
   });
 
   return {
-    deployer, treasury, one, two, three, four, five, six,  // accounts
+    deployer, treasury, one, two, three, four, five, nonWhitelistedUser,  // accounts
     token, validatorShare, validatorShare2, stakeManager, whitelist, staker // contracts
   }
 };

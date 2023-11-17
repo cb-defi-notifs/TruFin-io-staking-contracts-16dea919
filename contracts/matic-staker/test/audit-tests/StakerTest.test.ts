@@ -83,7 +83,6 @@ describe("Staker", () => {
           treasury.address,
           constants.PHI,
           constants.DIST_PHI,
-          constants.CAP,
         ])
       );
 
@@ -128,15 +127,6 @@ describe("Staker", () => {
         .to.emit(staker, "SetTreasury")
         .withArgs(treasury.address, deployer.address);
       expect(await staker.treasuryAddress()).to.equal(deployer.address);
-    });
-
-    it(`Set cap`, async () => {
-      const tx = await staker.setCap(parseEther("100"));
-
-      await expect(tx)
-        .to.emit(staker, "SetCap")
-        .withArgs(constants.CAP, parseEther("100"));
-      expect(await staker.cap()).to.equal(parseEther("100"));
     });
 
     it(`Set phi`, async () => {
@@ -213,7 +203,7 @@ describe("Staker", () => {
       // allocate
       const tx = await staker
         .connect(user1)
-        .allocate(parseEther("1000"), user2.address, false);
+        .allocate(parseEther("1000"), user2.address);
 
       await expect(tx).to.emit(staker, "Allocated");
 
@@ -225,7 +215,7 @@ describe("Staker", () => {
       await staker.connect(user1).deposit(amount, user1.address);
       await staker
         .connect(user1)
-        .allocate(parseEther("100"), user2.address, false);
+        .allocate(parseEther("100"), user2.address);
     });
 
     it(`Deallocate from user`, async () => {
@@ -236,41 +226,16 @@ describe("Staker", () => {
       // allocate
       await staker
         .connect(user1)
-        .allocate(parseEther("1000"), user2.address, false);
+        .allocate(parseEther("1000"), user2.address);
 
       const tx = await staker
         .connect(user1)
-        .deallocate(parseEther("1000"), user2.address, false);
+        .deallocate(parseEther("1000"), user2.address);
 
       await expect(tx).to.emit(staker, "Deallocated");
       expect(
         await staker.allocations(user1.address, user2.address, false)
       ).to.deep.equal([0, 0, 0]);
-    });
-
-    it(`Reallocate to another user`, async () => {
-      // stake as user1
-      const amount = parseEther("1000");
-      await staker.connect(user1).deposit(amount, user1.address);
-
-      // allocate
-      await staker
-        .connect(user1)
-        .allocate(parseEther("1000"), user2.address, false);
-
-      const tx = await staker
-        .connect(user1)
-        .reallocate(user2.address, deployer.address);
-
-      await expect(tx).to.emit(staker, "Reallocated");
-      expect(
-        await staker.allocations(user1.address, user2.address, false)
-      ).to.deep.equal([0, 0, 0]);
-
-      const userAlloc = await staker.allocations(user1.address, deployer.address, false)
-      const sharePrice = userAlloc.sharePriceNum/userAlloc.sharePriceDenom;
-      expect(userAlloc.maticAmount).to.equal(amount);
-      expect(sharePrice).to.equal(1e18);
     });
 
     it(`Distribute rewards`, async () => {
@@ -282,10 +247,10 @@ describe("Staker", () => {
       // allocate
       await staker
         .connect(user1)
-        .allocate(parseEther("100"), user2.address, false);
+        .allocate(parseEther("100"), user2.address);
       await staker
         .connect(user1)
-        .allocate(parseEther("400"), user2.address, false);
+        .allocate(parseEther("400"), user2.address);
 
       await helpers.time.increase(100000000);
 
@@ -295,7 +260,7 @@ describe("Staker", () => {
 
       await staker
         .connect(user1)
-        .distributeRewards(user2.address, user1.address, false, false);
+        .distributeRewards(user2.address, false);
 
       const user2BalanceAfter = await staker.balanceOf(user2.address);
 
@@ -315,7 +280,6 @@ describe("Staker", () => {
           treasury.address,
           constants.PHI,
           constants.DIST_PHI,
-          constants.CAP
         )
       ).to.be.revertedWith("Initializable: contract is already initialized");
     });
@@ -336,12 +300,6 @@ describe("Staker", () => {
       await expect(
         staker.connect(user1).setTreasury(user1.address)
       ).to.be.revertedWith("Ownable: caller is not the owner");
-    });
-
-    it(`When not owner tries to set cap`, async () => {
-      await expect(staker.connect(user1).setCap(100)).to.be.revertedWith(
-        "Ownable: caller is not the owner"
-      );
     });
 
     it(`When not owner tries to set phi`, async () => {
@@ -370,37 +328,25 @@ describe("Staker", () => {
 
     it(`When not whitelisted user tries to allocate`, async () => {
       await expect(
-        staker.connect(user3).allocate(1, deployer.address, false)
+        staker.connect(user3).allocate(1, deployer.address)
       ).to.be.revertedWithCustomError(staker, "UserNotWhitelisted");
     });
 
     it(`When not whitelisted user tries to deallocate`, async () => {
       await expect(
-        staker.connect(user3).deallocate(1, deployer.address, false)
-      ).to.be.revertedWithCustomError(staker, "UserNotWhitelisted");
-    });
-
-    it(`When not whitelisted user tries to reallocate`, async () => {
-      await expect(
-        staker.connect(user3).reallocate(user1.address, deployer.address)
+        staker.connect(user3).deallocate(1, deployer.address)
       ).to.be.revertedWithCustomError(staker, "UserNotWhitelisted");
     });
 
     it(`When try to allocate 0 amount`, async () => {
       await expect(
-          staker.allocate(0, deployer.address, false)
+          staker.allocate(0, deployer.address)
       ).to.be.revertedWithCustomError(staker, "AllocationUnderOneMATIC");
     });
 
     it(`When try to deallocate`, async () => {
       await expect(
-        staker.deallocate(1, deployer.address, false)
-      ).to.be.revertedWithCustomError(staker, "AllocationNonExistent");
-    });
-
-    it(`When try to reallocate if allocation not exists`, async () => {
-      await expect(
-        staker.reallocate(user1.address, deployer.address)
+        staker.deallocate(1, deployer.address)
       ).to.be.revertedWithCustomError(staker, "AllocationNonExistent");
     });
 

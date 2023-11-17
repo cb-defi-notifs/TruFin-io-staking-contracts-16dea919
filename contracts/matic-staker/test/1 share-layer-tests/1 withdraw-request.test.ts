@@ -10,12 +10,12 @@ import { submitCheckpoint } from "../helpers/state-interaction";
 describe("WITHDRAW REQUEST", () => {
   // Initial state, deposits, rewards compounding already tested
 
-  let treasury, deployer, one, two, staker, validatorShare;
+  let treasury, deployer, one, two, nonWhitelistedUser, staker, validatorShare;
   let TREASURY_INITIAL_DEPOSIT;
 
   beforeEach(async () => {
     // reset to fixture
-    ({ treasury, deployer, one, two, staker, validatorShare } = await loadFixture(deployment));
+    ({ treasury, deployer, one, two, nonWhitelistedUser, staker, validatorShare } = await loadFixture(deployment));
     TREASURY_INITIAL_DEPOSIT = parseEther(100)
     await staker.connect(treasury).deposit(TREASURY_INITIAL_DEPOSIT, treasury.address);
   });
@@ -189,20 +189,9 @@ describe("WITHDRAW REQUEST", () => {
     ).to.be.revertedWithCustomError(staker, "ValidatorDoesNotExist");
   });
 
-  it("Withdraw of strictly-allocated funds blocked", async () => {
-    // Enable strict allocation
-    await staker.connect(deployer).setAllowStrict(true);
-
-    // Deposit as one
-    await staker.connect(one).deposit(parseEther(10000), one.address);
-
-    // Strictly allocate to two
-    await staker.connect(one).allocate(parseEther(10000), two.address, true);
-
-    // Attempt to make a withdrawal request of strictly-allocated funds
-    await expect(staker.connect(one).withdraw(1, one.address, one.address)).to.be.revertedWithCustomError(
-      staker,
-      "WithdrawalAmountTooLarge"
-    );
+  it("try initiating a withdrawal from a specific validator with a non-whitelisted user", async () => {
+    await expect(
+      staker.connect(nonWhitelistedUser).withdrawFromSpecificValidator(parseEther(1000), one.address)
+    ).to.be.revertedWithCustomError(staker, "UserNotWhitelisted");
   });
 });

@@ -7,7 +7,6 @@ import {
     TREASURY_ADDRESS,
     PHI,
     DIST_PHI,
-    CAP,
 } from "../constants/constants";
 
 // Main
@@ -28,7 +27,6 @@ async function main() {
         TREASURY_ADDRESS[chainID],
         PHI,
         DIST_PHI,
-        CAP,
     ];
     console.log(args);
 

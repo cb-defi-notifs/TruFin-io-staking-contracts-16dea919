@@ -13,11 +13,11 @@ import { smock } from '@defi-wonderland/smock';
 describe("DEPOSIT", () => {
   // Pre-deposit checked in "INIT" describe block
 
-  let one, two, six, staker, stakeManager, treasury, deployer, validatorShare, token;
+  let one, two, nonWhitelistedUser, staker, stakeManager, treasury, deployer, validatorShare, token;
 
   beforeEach(async () => {
     // reset to fixture
-    ({ deployer, one, two, six, staker, stakeManager, treasury, validatorShare, token } = await loadFixture(deployment));
+    ({ deployer, one, two, nonWhitelistedUser, staker, stakeManager, treasury, validatorShare, token } = await loadFixture(deployment));
 
   });
 
@@ -208,17 +208,6 @@ describe("DEPOSIT", () => {
     ["depositToSpecificValidator(uint256,address)"](parseEther(0), validatorShare.address);
   });
 
-  it("try depositing more than the cap", async () => {
-    await expect(
-      staker
-        .connect(one)
-      .deposit(
-        constants.CAP.mul(110).div(100),
-        one.address
-      )
-    ).to.be.revertedWithCustomError(staker, "DepositSurpassesVaultCap");
-  });
-
   it("Can withdraw maxWithdraw amount", async () => {
     // deposit so that rewards can accrue
     await staker.connect(two).deposit(parseEther(10e3), two.address);
@@ -250,16 +239,15 @@ describe("DEPOSIT", () => {
   });
 
   it("unknown non-whitelist user deposit fails", async () => {
-    // six == nonwhitelisted signer
     await expect(
-      staker.connect(six).deposit(parseEther(1e18), six.address)
+      staker.connect(nonWhitelistedUser).deposit(parseEther(1e18), nonWhitelistedUser.address)
     ).to.be.revertedWithCustomError(staker, "UserNotWhitelisted");
   });
 
   it("unknown non-whitelist user cannot deposit to a whitelisted user's address", async () => {
     await expect(
       staker
-        .connect(six)
+        .connect(nonWhitelistedUser)
       ["deposit(uint256,address)"](
         parseEther(1e18),
         one.address
@@ -342,13 +330,12 @@ describe("DEPOSIT", () => {
   });
 
   it("unknown non-whitelist user deposit to  specific validator fails", async () => {
-    // six == nonwhitelisted signer
     // mock validator
     const newValidator = await smock.fake(constants.VALIDATOR_SHARE_ABI);
     await staker.connect(deployer).addValidator(newValidator.address);
 
     await expect(
-      staker.connect(six).depositToSpecificValidator(parseEther(1e18), newValidator.address)
+      staker.connect(nonWhitelistedUser).depositToSpecificValidator(parseEther(1e18), newValidator.address)
     ).to.be.revertedWithCustomError(staker, "UserNotWhitelisted");
   });
 
@@ -359,7 +346,7 @@ describe("DEPOSIT", () => {
 
     await expect(
       staker
-        .connect(six)
+        .connect(nonWhitelistedUser)
       ["depositToSpecificValidator(uint256,address)"](
         parseEther(1e18),
         newValidator.address
@@ -409,22 +396,6 @@ describe("DEPOSIT", () => {
       .connect(one)
     ["depositToSpecificValidator(uint256,address)"](parseEther(0), newValidator.address);
   });
-
-  it("try depositing more than the cap to specific validator", async () => {
-    // mock validator
-    const newValidator = await smock.fake(constants.VALIDATOR_SHARE_ABI);
-    await staker.connect(deployer).addValidator(newValidator.address);
-
-    await expect(
-      staker
-        .connect(one)
-      .depositToSpecificValidator(
-        constants.CAP.mul(110).div(100),
-        newValidator.address
-      )
-    ).to.be.revertedWithCustomError(staker, "DepositSurpassesVaultCap");
-  });
-
 });
 
 // TODO: organise tests

@@ -82,8 +82,6 @@ export const DIST_PHI = BigNumber.from(500);
 
 export const PHI_PRECISION = BigNumber.from(10000);
 
-export const CAP = BigNumber.from(10).pow(10 + 18); // 10 billion MATIC
-
 export const NAME = "TruStake MATIC Vault Shares";
 
 export const SYMBOL = "TruMATIC";

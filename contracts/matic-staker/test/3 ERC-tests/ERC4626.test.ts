@@ -86,45 +86,6 @@ describe("ERC-4626", () => {
     });
   });
 
-
-  describe("mint from specific validator", () => {
-    it("should revert if receiver is not caller ", async () => {
-      // mock validator
-      const validator = await smock.fake(constants.VALIDATOR_SHARE_ABI);
-      await staker.connect(deployer).addValidator(validator.address);
-
-      await expect(staker.connect(depositor).mintFromSpecificValidator(DEPOSIT, receiver.address, validator.address)).to.be.revertedWithCustomError(
-        staker,
-        "SenderAndOwnerMustBeReceiver"
-      );
-    });
-
-    it("should mint fresh shares to depositor who deposited to specific validator", async () => {
-      // mock validator
-      const validator = await smock.fake(constants.VALIDATOR_SHARE_ABI);
-      await staker.connect(deployer).addValidator(validator.address);
-      await staker.connect(depositor).mintFromSpecificValidator(SHARES, depositor.address, validator.address);
-
-      // Check depositor owns minted shares
-      expect(await staker.balanceOf(depositor.address)).to.equal(SHARES);
-    });
-
-    it("Mint from specific validator", async () => {
-      // mock validator
-      const validator = await smock.fake(constants.VALIDATOR_SHARE_ABI);
-      await staker.connect(deployer).addValidator(validator.address);
-
-      // stake as user1
-      const amount = parseEther(1000);
-
-      const tx = await staker.connect(depositor).mintFromSpecificValidator(amount, depositor.address, validator.address);
-
-      await expect(tx).to.emit(staker, "Deposited").withArgs(depositor.address, anyValue, anyValue, anyValue, anyValue, anyValue, validator.address);
-      expect(await staker.balanceOf(depositor.address)).to.equal(amount);
-    });
-
-  });
-
   describe("withdraw", () => {
     beforeEach(async () => {
       // Deposit at a share price of one
@@ -166,25 +127,12 @@ describe("ERC-4626", () => {
   });
 
   describe("maxRedeem", () => {
-    it("should reduce maximum share redepmtion by strictly allocated amount", async () => {
-      await staker.connect(deployer).setAllowStrict(true);
-
+    it("should return user balance", async () => {
       // Deposit
       await staker.connect(depositor).deposit(DEPOSIT, depositor.address);
 
       // Strictly allocate to receiver
-      await staker.connect(depositor).allocate(ALLOCATION, receiver.address, true);
-
-      // Check maxRedeem is half of deposit
-      expect(await staker.maxRedeem(depositor.address)).to.equal(DEPOSIT.sub(ALLOCATION));
-    });
-
-    it("should not reduce maximum share redemption by loosely allocated amount", async () => {
-      // Deposit
-      await staker.connect(depositor).deposit(DEPOSIT, depositor.address);
-
-      // Strictly allocate to receiver
-      await staker.connect(depositor).allocate(ALLOCATION, receiver.address, false);
+      await staker.connect(depositor).allocate(ALLOCATION, receiver.address);
 
       // Check maxRedeem is half of deposit
       expect(await staker.maxRedeem(depositor.address)).to.equal(DEPOSIT);

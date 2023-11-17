@@ -5,12 +5,14 @@
 
 import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
 import { expect } from "chai";
+const ethers = require('ethers');
 import * as constants from "../helpers/constants";
 import { deployment } from "../helpers/fixture";
 import {
-  calculateAmountFromShares, calculateSharesFromAmount, parseEther
+  calculateAmountFromShares, parseEther
 } from "../helpers/math";
 import { submitCheckpoint } from "../helpers/state-interaction";
+import { smock } from '@defi-wonderland/smock';
 
 describe("GETTERS", () => {
   let one, two, staker, validatorShare;
@@ -24,39 +26,11 @@ describe("GETTERS", () => {
     // todo: add tests for input validation
 
     it("maxDeposit", async () => {
-      const cap = await staker.cap();
-
-      // no deposits
-      let maxDeposit = cap.sub(await staker.totalStaked());
-
-      expect(await staker.maxDeposit(one.address)).to.equal(maxDeposit);
-
-      // deposit 1M MATIC
-      await staker.connect(one).deposit(parseEther(1e6), one.address);
-
-      maxDeposit = cap.sub(await staker.totalStaked());
-
-      expect(await staker.maxDeposit(one.address)).to.equal(maxDeposit);
+      expect(await staker.maxDeposit(one.address)).to.equal(ethers.utils.hexValue(ethers.BigNumber.from(2).pow(256).sub(1)));
     });
 
     it("maxMint", async () => {
-      const cap = await staker.cap();
-
-      // no deposits
-      let maxDeposit = cap.sub(await staker.totalStaked());
-      let sharePrice = await staker.sharePrice();
-      let maxMint = calculateSharesFromAmount(maxDeposit, sharePrice);
-
-      expect(await staker.maxMint(one.address)).to.equal(maxMint);
-
-      // deposit 1M MATIC
-      await staker.connect(one).deposit(parseEther(1e6), one.address);
-
-      maxDeposit = cap.sub(await staker.totalStaked());
-      sharePrice = await staker.sharePrice();
-      maxMint = calculateSharesFromAmount(maxDeposit, sharePrice);
-
-      expect(await staker.maxMint(one.address)).to.equal(maxMint);
+      expect(await staker.maxMint(one.address)).to.equal(ethers.utils.hexValue(ethers.BigNumber.from(2).pow(256).sub(1)));
     });
 
     it("maxWithdraw", async () => {
@@ -223,17 +197,26 @@ describe("GETTERS", () => {
     });
 
     it("get all validators, whether they are active, and the amount staked", async () => {
-      await staker.addValidator(one.address);
-      await staker.addValidator(two.address);
-      await staker.disableValidator(two.address);
+
+      const secondValidator = await smock.fake(constants.VALIDATOR_SHARE_ABI);
+      const secondValidatorStake = parseEther(222);
+      secondValidator.getTotalStake.returns([secondValidatorStake, 1]);
+
+      const thirdValidator = await smock.fake(constants.VALIDATOR_SHARE_ABI);
+      const thirdValidatorStake = parseEther(0);
+      thirdValidator.getTotalStake.returns([thirdValidatorStake, 1]);
+
+      await staker.addValidator(secondValidator.address);
+      await staker.addValidator(thirdValidator.address);
+      await staker.disableValidator(thirdValidator.address);
 
       expect(await staker.connect(one).getAllValidators()).to.deep.equal([
         [constants.VALIDATOR_STATE.ENABLED, 0, validatorShare.address],
-        [constants.VALIDATOR_STATE.ENABLED, 0, one.address],
-        [constants.VALIDATOR_STATE.DISABLED, 0, two.address],
+        [constants.VALIDATOR_STATE.ENABLED, secondValidatorStake.toString(), secondValidator.address],
+        [constants.VALIDATOR_STATE.DISABLED, thirdValidatorStake.toString(), thirdValidator.address],
       ])
-      });
     });
   });
+});
 
 // todo: write some tests which fail without the magic number

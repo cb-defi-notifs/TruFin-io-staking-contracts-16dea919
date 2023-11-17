@@ -4,6 +4,7 @@ import * as constants from "../helpers/constants";
 import { deployment } from "../helpers/fixture";
 import {parseEther} from "../helpers/math";
 import { ethers,upgrades } from "hardhat";
+import { smock } from '@defi-wonderland/smock';
 
 describe("SETTERS", () => {
   let one, two, staker, phiPrecision;
@@ -90,25 +91,6 @@ describe("SETTERS", () => {
     });
   });
 
-  describe("setCap", async () => {
-    it("Reverts with too low value", async () => {
-        await staker.connect(one).deposit(parseEther(2000),one.address);
-        const ts = await staker.totalStaked()
-        await expect(staker.setCap(ts.sub(1))).to.be.revertedWithCustomError(staker,"CapTooLow");
-    });
-    it("Works with a new value", async () => {
-        const cap = await staker.cap()
-        await staker.setCap(cap.add(1e10));
-        expect(await staker.cap()).to.equal(cap.add(1e10));
-    });
-    it("Works with the same value", async () => {
-    const cap = await staker.cap();
-    await staker.setCap(cap);
-    expect(await staker.cap()).to.equal(cap);
-    });
-
-  });
-
   describe("setEpsilon", async () => {
     it("Reverts with too high value", async () => {
         await expect(staker.setEpsilon(1e12 + 1)).to.be.revertedWithCustomError(staker,"EpsilonTooLarge");
@@ -143,6 +125,10 @@ describe("SETTERS", () => {
         expect(await staker.minDeposit()).to.equal(minDeposit);
     });
 
+    it("Fails if set by non-owner", async () => {
+        await expect(staker.connect(one).setMinDeposit(parseEther(1e4))).to.be.revertedWith("Ownable: caller is not the owner");;
+    });
+
   });
 
 });
@@ -155,24 +141,34 @@ describe("Validators", () => {
   });
 
   describe("addValidator", async () => {
+    let newValidator;
+    let addValidatorTx;
+
+    beforeEach(async () => {
+      // setup a mock validator with a pre-existing stake
+      newValidator = await smock.fake(constants.VALIDATOR_SHARE_ABI);
+      newValidator.getTotalStake.returns([parseEther(123), 1]);
+      addValidatorTx = await staker.connect(deployer).addValidator(newValidator.address);
+    });
 
     it("Adds a new validator", async () => {
-
-      await staker.connect(deployer).addValidator(two.address);
-
       const validators = await staker.getValidators();
       const lastAddedAddress = validators[validators.length - 1]
 
-      expect(lastAddedAddress).to.equal(two.address);
-      const validator = await staker.validators(two.address);
+      expect(lastAddedAddress).to.equal(newValidator.address);
+      const validator = await staker.validators(newValidator.address);
       expect(validator.state).to.equal(constants.VALIDATOR_STATE.ENABLED);
     });
 
-    it("Emits the expected event", async () => {
-      const tx = await staker.connect(deployer).addValidator(two.address);
+    it("Sets the amount staked on the validator", async () => {
+      // verify that the staked amount in the staker's Validator struct matches the pre-existing stake
+      const [,stakedAmount,] = await staker.validators(newValidator.address);
+      await expect(stakedAmount).to.equal(parseEther(123));
+    });
 
-      await expect(tx).to.emit(staker, "ValidatorAdded")
-        .withArgs(two.address);
+    it("Emits the expected event", async () => {
+      await expect(addValidatorTx).to.emit(staker, "ValidatorAdded")
+        .withArgs(newValidator.address, parseEther(123));
     });
 
     it("Reverts with zero address", async () => {
@@ -182,10 +178,8 @@ describe("Validators", () => {
     });
 
     it("Reverts with an existing address", async () => {
-      await staker.connect(deployer).addValidator(two.address);
-
       await expect(
-        staker.connect(deployer).addValidator(two.address)
+        staker.connect(deployer).addValidator(newValidator.address)
       ).to.be.revertedWithCustomError(staker, "ValidatorAlreadyExists");
     });
 
@@ -285,6 +279,48 @@ describe("Validators", () => {
       ).to.be.revertedWith("Ownable: caller is not the owner");
     });
   });
+
+  describe("setDefaultValidator", async () => {
+
+    it("Sets a default validator", async () => {
+      // mock validator
+      const newValidator = await smock.fake(constants.VALIDATOR_SHARE_ABI);
+      newValidator.getTotalStake.returns([parseEther(123), 1]);
+
+      // add the new validator to enable it
+      await staker.connect(deployer).addValidator(newValidator.address);
+
+      // set it as the default validator
+      await staker.connect(deployer).setDefaultValidator(newValidator.address);
+
+      expect(await staker.defaultValidatorAddress()).to.equal(newValidator.address);
+    });
+
+    it("Emits the expected event", async () => {
+      await expect(staker.connect(deployer).setDefaultValidator(validatorShare.address)).to.emit(staker, "SetDefaultValidator")
+      .withArgs(validatorShare.address, validatorShare.address);
+    });
+
+    it("Reverts when called by non-owner", async () => {
+      await expect(staker.connect(one).setDefaultValidator(validatorShare.address)).to.be.revertedWith("Ownable: caller is not the owner");
+    });
+
+    it("Reverts with zero address", async () => {
+      await expect(
+        staker.connect(deployer).setDefaultValidator(ethers.constants.AddressZero)
+      ).to.be.revertedWithCustomError(staker,"ZeroAddressNotSupported");
+    });
+
+    it("Reverts with a non-enabled validated", async () => {
+      let newValidator = await smock.fake(constants.VALIDATOR_SHARE_ABI);
+      newValidator.getTotalStake.returns([parseEther(123), 1]);
+      await staker.connect(deployer).addValidator(newValidator.address);
+      await staker.connect(deployer).disableValidator(newValidator.address);
+      await expect(
+        staker.connect(deployer).setDefaultValidator(newValidator.address)
+      ).to.be.revertedWithCustomError(staker, "ValidatorNotEnabled");
+    });
+  });
 });
 
 describe("Other", () => {
@@ -297,7 +333,7 @@ describe("Other", () => {
     describe("allocate", async () => {
         it("Reverts with zero address", async () => {
             await staker.connect(one).deposit(parseEther(20),one.address);
-            await expect(staker.connect(one).allocate(parseEther(10),ethers.constants.AddressZero,false)).to.be.revertedWithCustomError(staker,"ZeroAddressNotSupported");
+            await expect(staker.connect(one).allocate(parseEther(10),ethers.constants.AddressZero)).to.be.revertedWithCustomError(staker,"ZeroAddressNotSupported");
         });
     });
 });
@@ -323,7 +359,6 @@ describe("Deployment", () => {
                   treasury.address,
                   constants.PHI_PRECISION,
                   constants.DIST_PHI,
-                  constants.CAP
                 ])
               )
             ).to.be.revertedWithCustomError(staker, "ZeroAddressNotSupported");
@@ -337,7 +372,6 @@ describe("Deployment", () => {
                     treasury.address,
                     constants.PHI_PRECISION,
                     constants.DIST_PHI,
-                    constants.CAP
                   ])
                 )
               ).to.be.revertedWithCustomError(staker, "ZeroAddressNotSupported");
@@ -351,7 +385,6 @@ describe("Deployment", () => {
                     treasury.address,
                     constants.PHI_PRECISION,
                     constants.DIST_PHI,
-                    constants.CAP
                   ])
                 )
               ).to.be.revertedWithCustomError(staker, "ZeroAddressNotSupported");
@@ -365,7 +398,6 @@ describe("Deployment", () => {
                     treasury.address,
                     constants.PHI_PRECISION,
                     constants.DIST_PHI,
-                    constants.CAP
                   ])
                 )
               ).to.be.revertedWithCustomError(staker, "ZeroAddressNotSupported");
@@ -379,7 +411,6 @@ describe("Deployment", () => {
                     ethers.constants.AddressZero,
                     constants.PHI_PRECISION,
                     constants.DIST_PHI,
-                    constants.CAP
                   ])
                 )
               ).to.be.revertedWithCustomError(staker, "ZeroAddressNotSupported");
