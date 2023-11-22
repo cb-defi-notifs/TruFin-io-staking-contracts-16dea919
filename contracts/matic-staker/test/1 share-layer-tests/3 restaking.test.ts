@@ -47,7 +47,7 @@ describe("RESTAKE", () => {
   });
 
   describe("Vault: compound rewards", async () => {
-    it.skip("rewards compounded correctly (compoundRewards: using unclaimed rewards)", async () => {
+    it("rewards compounded correctly (compoundRewards: using unclaimed rewards)", async () => {
       // deposit some MATIC
       let depositAmt = parseEther(10e6);
       await staker
@@ -131,9 +131,6 @@ describe("RESTAKE", () => {
         .connect(one)
         .deposit(depositAmt, one.address);
 
-      // artificially increase claimed rewards (as we can only simulate rewards once)
-      // if we properly simulate rewards using new instances of the polygon contracts, we can test this without helpers
-
       // set `claimedRewards` / MATIC balance to 1 MATIC
       await setTokenBalance(token, staker.address, parseEther(1));
 
@@ -159,8 +156,46 @@ describe("RESTAKE", () => {
       expect(await staker.totalAssets()).to.equal(parseEther(0));
       expect(await staker.totalRewards()).to.equal(parseEther(0));
       expect(await staker.totalStaked()).to.equal(
-        preStakeTotalStaked.add(preStakeClaimedRewards)
+        preStakeTotalStaked.add(preStakeClaimedRewards).add(preStakeTotalRewards)
       );
+    });
+
+    it("compoundRewards correctly updates staked amount", async () => {
+       // add a new validator
+       await staker.addValidator(validatorShare2.address);
+
+      // deposit some MATIC into the default and new validator
+      let depositAmt = parseEther(5e6);
+      await staker.connect(one).deposit(depositAmt, one.address);
+      await staker.connect(one).depositToSpecificValidator(depositAmt, validatorShare2.address);
+
+      // set `claimedRewards` / MATIC balance to 1 MATIC
+      await setTokenBalance(token, staker.address, parseEther(1));
+
+      // submit checkpoint, increase rewards
+      await submitCheckpoint(0);
+
+      let preClaimedRewards = await staker.totalAssets();
+      let preTotalRewardsV1 = await staker.getRewardsFromValidator(validatorShare.address);
+      let preTotalStakedV1 = await staker.validators(validatorShare.address);
+      let preTotalRewardsV2 = await staker.getRewardsFromValidator(validatorShare2.address);
+      let preTotalStakedV2 = await staker.validators(validatorShare2.address);
+
+      expect(preTotalRewardsV1).to.be.greaterThan(parseEther(0));
+      expect(preTotalStakedV2.stakedAmount).to.equal(depositAmt);
+      expect(preTotalRewardsV2).to.be.greaterThan(parseEther(0));
+      expect(preTotalStakedV1.stakedAmount).to.equal(depositAmt);
+
+      // call compoundRewards on the default validator
+      await staker.connect(deployer).compoundRewards(validatorShare.address);
+
+      let postTotalStakedV1 = await staker.validators(validatorShare.address);
+      let postTotalStakedV2 = await staker.validators(validatorShare2.address);
+
+      // v1 staked amount should have increased by the validator's unclaimed rewards plus the claimed rewards in the contract
+      expect((preTotalStakedV1.stakedAmount).add(preTotalRewardsV1).add(preClaimedRewards)).to.equal(postTotalStakedV1.stakedAmount);
+      // v2 staked amount should have increased by the validator's unclaimed rewards
+      expect((preTotalStakedV2.stakedAmount).add(preTotalRewardsV2)).to.equal(postTotalStakedV2.stakedAmount);
     });
 
     it("does not revert when compounding zero rewards", async () => {
@@ -284,7 +319,7 @@ describe("RESTAKE", () => {
       // compound rewards on both validators
       await staker.connect(deployer).compoundRewards(validatorShare.address);
 
-      // verity rewards got restaked on both validators
+      // verify rewards got restaked on both validators
       expect(await validatorShare.getLiquidRewards(staker.address)).to.equal(0);
       expect(await validatorShare2.getLiquidRewards(staker.address)).to.equal(0);
 

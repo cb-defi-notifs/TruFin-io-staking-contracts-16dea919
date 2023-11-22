@@ -27,8 +27,6 @@ interface IStakeManager {
 
     function unstake(uint256 validatorId) external;
 
-    function totalStakedFor(address addr) external view returns (uint256);
-
     function stakeFor(
         address user,
         uint256 amount,
@@ -47,9 +45,24 @@ interface IStakeManager {
 
     function updateValidatorState(uint256 validatorId, int256 amount) external;
 
-    function ownerOf(uint256 tokenId) external view returns (address);
-
     function slash(bytes calldata slashingInfoList) external returns (uint256);
+
+    function decreaseValidatorDelegatedAmount(uint256 validatorId, uint256 amount) external;
+
+    function withdrawDelegatorsReward(uint256 validatorId) external returns(uint256);
+
+    function dethroneAndStake(
+        address auctionUser,
+        uint256 heimdallFee,
+        uint256 validatorId,
+        uint256 auctionAmount,
+        bool acceptDelegation,
+        bytes calldata signerPubkey
+    ) external;
+
+    function totalStakedFor(address addr) external view returns (uint256);
+
+    function ownerOf(uint256 tokenId) external view returns (address);
 
     function validatorStake(uint256 validatorId) external view returns (uint256);
 
@@ -61,18 +74,5 @@ interface IStakeManager {
 
     function delegatedAmount(uint256 validatorId) external view returns(uint256);
 
-    function decreaseValidatorDelegatedAmount(uint256 validatorId, uint256 amount) external;
-
-    function withdrawDelegatorsReward(uint256 validatorId) external returns(uint256);
-
     function delegatorsReward(uint256 validatorId) external view returns(uint256);
-
-    function dethroneAndStake(
-        address auctionUser,
-        uint256 heimdallFee,
-        uint256 validatorId,
-        uint256 auctionAmount,
-        bool acceptDelegation,
-        bytes calldata signerPubkey
-    ) external;
 }

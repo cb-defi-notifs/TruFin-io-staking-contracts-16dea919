@@ -71,5 +71,4 @@ abstract contract TruStakeMATICv2Storage {
 
     /// @notice Gap for upgradeability.
     uint256[44] private __gap;
-
 }
