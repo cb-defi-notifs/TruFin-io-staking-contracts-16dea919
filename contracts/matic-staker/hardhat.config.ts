@@ -69,5 +69,8 @@ export default {
     only: [':TruStakeMATICv2'],
     spacing: 2,
     format: "json" // minimal
-  }
+  },
+  paths: {
+    sources: "./test/contracts",
+ }
 };
