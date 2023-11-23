@@ -20,7 +20,7 @@ describe("ALLOCATION", () => {
     ));
 
     // Deposit 10k MATIC with account one
-    await staker.connect(one).deposit(parseEther(10000), one.address);
+    await staker.connect(one).deposit(parseEther(10000));
   });
 
 
@@ -203,7 +203,7 @@ describe("ALLOCATION", () => {
       expect(dust).to.equal(calculatedDust);
 
       // Four deposits 1k
-      await staker.connect(four).deposit(parseEther(1000), four.address);
+      await staker.connect(four).deposit(parseEther(1000));
       const sharePriceFractionNew = await staker.sharePrice();
 
       // With new deposit, rewards were swept up and dumped into contract,
@@ -325,7 +325,7 @@ describe("ALLOCATION", () => {
 
     it("pass: allocate full amount deposited to one other user", async () => {
       // Depositing as two since one already deposits 10k
-      await staker.connect(two).deposit(parseEther(5), two.address);
+      await staker.connect(two).deposit(parseEther(5));
 
       // Try allocating all 5 MATIC deposited to three
       await staker.connect(two).allocate(parseEther(5), three.address);
@@ -478,7 +478,7 @@ describe("ALLOCATION", () => {
       // DUMP
 
       // Deposit as one to mint some shares
-      await staker.connect(one).deposit(parseEther(10e3), one.address);
+      await staker.connect(one).deposit(parseEther(10e3));
 
       // Dump MATIC into staker as two
       await token.connect(two).transfer(staker.address, parseEther(123456));
@@ -486,7 +486,7 @@ describe("ALLOCATION", () => {
       // DEPOSIT
 
       // Deposit as three at weird share price
-      await staker.connect(three).deposit(depositAmount, three.address);
+      await staker.connect(three).deposit(depositAmount);
 
       // getUserInfo (1)
       let userData = await staker.getUserInfo(three.address);
@@ -577,13 +577,13 @@ describe("ALLOCATION", () => {
       const depositAmount = parseEther(5e3);
 
       // Deposit as one to mint some shares
-      await staker.connect(one).deposit(parseEther(10e3), one.address);
+      await staker.connect(one).deposit(parseEther(10e3));
 
       await submitCheckpoint(0);
       await submitCheckpoint(1);
 
       // Deposit as three at weird share price
-      await staker.connect(three).deposit(depositAmount, three.address);
+      await staker.connect(three).deposit(depositAmount);
 
       // getUserInfo (1)
       let userData = await staker.getUserInfo(three.address);

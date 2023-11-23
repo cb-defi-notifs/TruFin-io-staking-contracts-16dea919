@@ -22,10 +22,10 @@ describe("WITHDRAW CLAIM", () => {
 
     beforeEach(async () => {
       // deposit
-      await staker.connect(one).deposit(parseEther(10000), one.address);
+      await staker.connect(one).deposit(parseEther(10000));
 
       // initate withdrawal with user one
-      await staker.connect(one).withdraw(parseEther(3000), one.address, one.address);
+      await staker.connect(one).withdraw(parseEther(3000));
 
       // set unbondNonce
       unbondNonce = await staker.getUnbondNonce(validatorShare.address);
@@ -163,7 +163,7 @@ describe("WITHDRAW CLAIM", () => {
 
     it("claim withdrawal requested from a specific validator 80 epochs ago", async () => {
        // deposit and initiate withdrawal with user two
-       await staker.connect(two).deposit(parseEther(3000), two.address);
+       await staker.connect(two).deposit(parseEther(3000));
        await staker.connect(two).withdrawFromSpecificValidator(parseEther(3000), validatorShare.address);
 
        // set unbondNonce
@@ -275,17 +275,17 @@ describe("WITHDRAW CLAIM", () => {
       // each 10 epochs apart
 
       // deposit 1M MATIC
-      await staker.connect(one).deposit(parseEther(1e6), one.address);
-      await staker.connect(two).deposit(parseEther(1e6), two.address);
+      await staker.connect(one).deposit(parseEther(1e6));
+      await staker.connect(two).deposit(parseEther(1e6));
 
       // initiate withdrawals, inc. epoch between each
-      await staker.connect(one).withdraw(parseEther(10_000), one.address, one.address); // n1
+      await staker.connect(one).withdraw(parseEther(10_000)); // n1
       await advanceEpochs(stakeManager, 10);
-      await staker.connect(one).withdraw(parseEther(1_000), one.address, one.address); // n1
+      await staker.connect(one).withdraw(parseEther(1_000)); // n1
       await advanceEpochs(stakeManager, 10);
-      await staker.connect(one).withdraw(parseEther(100_000), one.address, one.address); // n1
+      await staker.connect(one).withdraw(parseEther(100_000)); // n1
       await advanceEpochs(stakeManager, 10);
-      await staker.connect(two).withdraw(parseEther(10_000), two.address, two.address); // n1
+      await staker.connect(two).withdraw(parseEther(10_000)); // n1
 
       // save unbond nonces for tests
       n4 = await staker.getUnbondNonce(validatorShare.address);

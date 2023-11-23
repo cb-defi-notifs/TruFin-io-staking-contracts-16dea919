@@ -80,7 +80,7 @@ describe("INIT", () => {
       await expect(
         staker
           .connect(zeroSigner)
-        ["deposit(uint256,address)"](parseEther(5000), AddressZero)
+          .deposit(parseEther(5000))
       ).to.be.revertedWithCustomError(staker, "UserNotWhitelisted");
 
       // stop impersonating non-whitelisted address
@@ -189,8 +189,7 @@ describe("INIT", () => {
       expect(await staker.balanceOf(three.address)).to.equal(BigNumber.from(0)); // legitimate user
 
       // deposit 1 wei as first malicious user (one)
-      // await staker.connect(one).deposit(BigNumber.from(1), one.address);
-      await staker.connect(one).deposit(depositAmount, one.address);
+      await staker.connect(one).deposit(depositAmount);
 
       // check new share price and balances are as expected
       expect(sharePriceEquality(await staker.sharePrice(), initSharePrice)).to.equal(true); // unchanged
@@ -217,19 +216,19 @@ describe("INIT", () => {
     it("fail: depositing under 1 MATIC", async () => {
       // try depositing 1 wei
       await expect(
-        staker.connect(one).deposit(BigNumber.from(1), one.address)
+        staker.connect(one).deposit(BigNumber.from(1))
       ).to.be.revertedWithCustomError(staker, "DepositBelowMinDeposit");
 
       // try depositing 1e18 - 1 wei
       await expect(
-        staker.connect(one).deposit(parseEther(1).sub(BigNumber.from(1)), one.address)
+        staker.connect(one).deposit(parseEther(1).sub(BigNumber.from(1)))
       ).to.be.revertedWithCustomError(staker, "DepositBelowMinDeposit");
     });
 
     it("pass: deposit 1 MATIC or more", async () => {
-      await staker.connect(one).deposit(parseEther(1), one.address);
+      await staker.connect(one).deposit(parseEther(1));
 
-      await staker.connect(one).deposit(parseEther(1).add(BigNumber.from(1)), one.address);
+      await staker.connect(one).deposit(parseEther(1).add(BigNumber.from(1)));
     });
   });
 });

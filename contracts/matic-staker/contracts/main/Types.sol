@@ -36,5 +36,7 @@ struct Validator {
 
 /// @notice Enum for the possible validator states.
 enum ValidatorState {
-    NONE, ENABLED, DISABLED
+    NONE,
+    ENABLED,
+    DISABLED
 }

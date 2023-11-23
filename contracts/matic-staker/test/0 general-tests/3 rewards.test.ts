@@ -14,7 +14,7 @@ describe("Checkpoint Submissions", () => {
     ({ staker, one, deployer } = await loadFixture(deployment));
 
     // deposit on default validator
-    await staker.connect(one).deposit(parseEther(1000), one.address);
+    await staker.connect(one).deposit(parseEther(1000));
 
     // add a new validator and deposit to it
     const newValidator = await smock.fake(constants.VALIDATOR_SHARE_ABI);
@@ -50,7 +50,7 @@ describe("Checkpoint Submissions", () => {
     ({ staker, one, deployer, validatorShare} = await loadFixture(deployment));
 
     // deposit on default validator
-    await staker.connect(one).deposit(parseEther(1000), one.address);
+    await staker.connect(one).deposit(parseEther(1000));
 
     // add a new validator and deposit to it
     const newValidator = await smock.fake(constants.VALIDATOR_SHARE_ABI);
@@ -83,7 +83,7 @@ describe("Checkpoint Submissions", () => {
     ({ staker, one, validatorShare } = await loadFixture(deployment));
 
     // deposit on default validator
-    await staker.connect(one).deposit(parseEther(1000), one.address);
+    await staker.connect(one).deposit(parseEther(1000));
 
     let lastRewards = await staker.getRewardsFromValidator(validatorShare.address);
     // console.log("Rewards:", lastRewards.toString());

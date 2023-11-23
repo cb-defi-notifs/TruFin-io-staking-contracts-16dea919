@@ -175,23 +175,15 @@ interface ITruStakeMATICv2 {
         ValidatorState indexed _newState
     );
 
-    event RestakeError(
-        address indexed _validator,
-        string _reason
-    );
+    event RestakeError(address indexed _validator, string _reason);
 
     // --- Errors ---
 
-    /// @notice Error used in ERC-4626 integration, thrown when user tries to transfer
-    /// or approve to zero address.
+    /// @notice Error thrown when user tries to transfer or approve to zero address.
     error ZeroAddressNotSupported();
 
     /// @notice Error thrown when a user tries to interact with a whitelisted-only function.
     error UserNotWhitelisted();
-
-    /// @notice Error used in ERC-4626 integration, thrown when user tries to act on
-    /// behalf of different user.
-    error SenderAndOwnerMustBeReceiver();
 
     /// @notice Error thrown when a user tries to deposit less than the minimum deposit amount.
     error DepositBelowMinDeposit();
@@ -249,5 +241,4 @@ interface ITruStakeMATICv2 {
 
     /// @notice Error thrown when trying to perform actions on a non-existent validator.
     error ValidatorDoesNotExist();
-
 }

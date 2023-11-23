@@ -109,8 +109,8 @@ describe("Staker", () => {
         it(`Scenario`, async () => {
             // stake as user1 and user2
             const amount = parseEther("1000");
-            await staker.connect(user1).deposit(amount, user1.address);
-            await staker.connect(user2).deposit(amount, user2.address);
+            await staker.connect(user1).deposit(amount);
+            await staker.connect(user2).deposit(amount);
 
             // allocate
             await staker.connect(user1).allocate(parseEther("100"), user2.address);

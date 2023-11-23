@@ -26,7 +26,7 @@ describe("DEALLOCATE", () => {
     } = await loadFixture(deployment));
 
       //Deposit ALLOCATED_AMOUNT
-    await staker.connect(allocatorOne).deposit(ALLOCATED_AMOUNT, allocatorOne.address);
+    await staker.connect(allocatorOne).deposit(ALLOCATED_AMOUNT);
     strictness = false;
     distributionInMATIC = false;
     // Deposit and allocated ALLOCATED_AMOUNT to recipientOne
@@ -75,7 +75,7 @@ describe("DEALLOCATE", () => {
 
     it("Removes recipient from distributor's recipients if full individual deallocation", async () => {
       // Make similar further allocation to recipientTwo to ensure removal logic works with multiple recipients
-      await staker.connect(allocatorOne).deposit(ALLOCATED_AMOUNT, allocatorOne.address);
+      await staker.connect(allocatorOne).deposit(ALLOCATED_AMOUNT);
       await staker.connect(allocatorOne).allocate(ALLOCATED_AMOUNT, recipientTwo.address);
 
       // Complete deallocation for recipientOne
@@ -97,7 +97,7 @@ describe("DEALLOCATE", () => {
 
     it("Removes distributor from recipient's distributors if full individual deallocation", async () => {
       // Make similar further allocation from allocatorTwo to recipientOne to ensure removal logic works with multiple allocators
-      await staker.connect(allocatorTwo).deposit(ALLOCATED_AMOUNT, allocatorTwo.address);
+      await staker.connect(allocatorTwo).deposit(ALLOCATED_AMOUNT);
       await staker.connect(allocatorTwo).allocate(ALLOCATED_AMOUNT, recipientOne.address);
 
       // Complete deallocation by allocatorOne
@@ -226,7 +226,7 @@ describe("DEALLOCATE", () => {
 
     describe("Functionality", async () => {
       it("Deallocate reduces rewards proportionally", async () => {
-        await staker.connect(allocatorOne).deposit(ALLOCATED_AMOUNT, allocatorOne.address);
+        await staker.connect(allocatorOne).deposit(ALLOCATED_AMOUNT);
 
         // Allocate equal amount to recipientTwo
         await staker.connect(allocatorOne).allocate(ALLOCATED_AMOUNT, recipientTwo.address);
@@ -254,7 +254,7 @@ describe("DEALLOCATE", () => {
         const SMALLER_ALLOCATED_AMOUNT = parseEther(5000);
 
         // Deposit and allocate to recipientTwo a smaller amount than recipientOne
-        await staker.connect(allocatorOne).deposit(SMALLER_ALLOCATED_AMOUNT, allocatorOne.address);
+        await staker.connect(allocatorOne).deposit(SMALLER_ALLOCATED_AMOUNT);
         await staker.connect(allocatorOne).allocate(SMALLER_ALLOCATED_AMOUNT, recipientTwo.address);
 
         // Accrue rewards

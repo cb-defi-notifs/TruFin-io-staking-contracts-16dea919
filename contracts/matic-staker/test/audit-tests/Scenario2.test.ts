@@ -103,8 +103,8 @@ describe("Scenario -- Check storage after allocate/deallocate", () => {
 
     describe(`Flow`, async () => {
         it(`Deposit as user1, deployer`, async () => {
-            await staker.deposit(parseEther("100000"), deployer.address);
-            await staker.connect(user1).deposit(parseEther("1000"), user1.address);
+            await staker.deposit(parseEther("100000"));
+            await staker.connect(user1).deposit(parseEther("1000"));
         });
 
         it(`Allocate user1 -> user2`, async () => {

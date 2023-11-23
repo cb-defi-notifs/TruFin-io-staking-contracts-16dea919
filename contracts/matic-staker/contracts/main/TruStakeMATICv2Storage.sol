@@ -6,7 +6,6 @@ import {Withdrawal, Allocation, Validator} from "./Types.sol";
 
 /// @title TruStakeMATICStorage
 abstract contract TruStakeMATICv2Storage {
-
     /// @notice Address of MATIC on this chain (Ethereum and Goerli supported).
     address public stakingTokenAddress;
 

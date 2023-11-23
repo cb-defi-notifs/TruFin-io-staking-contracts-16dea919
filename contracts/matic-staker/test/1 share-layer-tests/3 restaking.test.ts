@@ -31,7 +31,7 @@ describe("RESTAKE", () => {
       // already checked rewards are zero immediately after deposit
       await staker
         .connect(one)
-        .deposit(parseEther(10000000), one.address);
+        .deposit(parseEther(10000000));
 
       for(let i = 0; i < 5; i++) {
         // simulate passing checkpoint
@@ -50,9 +50,7 @@ describe("RESTAKE", () => {
     it("rewards compounded correctly (compoundRewards: using unclaimed rewards)", async () => {
       // deposit some MATIC
       let depositAmt = parseEther(10e6);
-      await staker
-        .connect(one).
-        deposit(depositAmt, one.address);
+      await staker.connect(one).deposit(depositAmt);
 
       // accrue rewards
       await submitCheckpoint(0);
@@ -129,7 +127,7 @@ describe("RESTAKE", () => {
       let depositAmt = parseEther(10e6);
       await staker
         .connect(one)
-        .deposit(depositAmt, one.address);
+        .deposit(depositAmt);
 
       // set `claimedRewards` / MATIC balance to 1 MATIC
       await setTokenBalance(token, staker.address, parseEther(1));
@@ -166,7 +164,7 @@ describe("RESTAKE", () => {
 
       // deposit some MATIC into the default and new validator
       let depositAmt = parseEther(5e6);
-      await staker.connect(one).deposit(depositAmt, one.address);
+      await staker.connect(one).deposit(depositAmt);
       await staker.connect(one).depositToSpecificValidator(depositAmt, validatorShare2.address);
 
       // set `claimedRewards` / MATIC balance to 1 MATIC

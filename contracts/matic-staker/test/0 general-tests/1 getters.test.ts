@@ -22,16 +22,8 @@ describe("GETTERS", () => {
     ({ one, two, staker, validatorShare } = await loadFixture(deployment));
   });
 
-  describe("ERC-4626: max functions", async () => {
+  describe("Max functions", async () => {
     // todo: add tests for input validation
-
-    it("maxDeposit", async () => {
-      expect(await staker.maxDeposit(one.address)).to.equal(ethers.utils.hexValue(ethers.BigNumber.from(2).pow(256).sub(1)));
-    });
-
-    it("maxMint", async () => {
-      expect(await staker.maxMint(one.address)).to.equal(ethers.utils.hexValue(ethers.BigNumber.from(2).pow(256).sub(1)));
-    });
 
     it("maxWithdraw", async () => {
       // no deposits
@@ -43,7 +35,7 @@ describe("GETTERS", () => {
       expect(await staker.maxWithdraw(one.address)).to.equal(0);
 
       // deposit 1M MATIC
-      await staker.connect(one).deposit(parseEther(1e6), one.address);
+      await staker.connect(one).deposit(parseEther(1e6));
 
       const balanceNew = await staker.balanceOf(one.address);
       const sharePriceNew = await staker.sharePrice();
@@ -83,7 +75,7 @@ describe("GETTERS", () => {
 
     it("pass: output of maxWithdraw is greater than to just deposited amount without accrual", async () => {
       // deposit 5 MATIC
-      await staker.connect(one).deposit(parseEther(5), one.address);
+      await staker.connect(one).deposit(parseEther(5));
       // call max withdraw
       const maxWithdrawAmount = await staker.maxWithdraw(one.address);
       // assert greaterThan,  added along with magic number
@@ -92,96 +84,74 @@ describe("GETTERS", () => {
 
     it("pass: withdraw output of maxWithdraw after depositing", async () => {
       // reserve fund
-      await staker.connect(one).deposit(parseEther(1e4), one.address);
+      await staker.connect(one).deposit(parseEther(1e4));
 
       // deposit 5 MATIC
-      await staker.connect(two).deposit(parseEther(5), two.address);
+      await staker.connect(two).deposit(parseEther(5));
       // call max withdraw
       const maxWithdrawAmount = await staker.maxWithdraw(two.address);
       // withdraw output
-      await staker.connect(two).withdraw(maxWithdrawAmount, two.address, two.address);
+      await staker.connect(two).withdraw(maxWithdrawAmount);
     });
 
     it("fail: cannot withdraw 1 + output of maxWithdraw after depositing", async () => {
       // deposit 5 MATIC
-      await staker.connect(one).deposit(parseEther(5), one.address);
+      await staker.connect(one).deposit(parseEther(5));
       // call max withdraw
       const maxWithdrawAmount = await staker.maxWithdraw(one.address);
       // withdraw output
       await expect(
-        staker.connect(one).withdraw(maxWithdrawAmount.add(1), one.address, one.address)
+        staker.connect(one).withdraw(maxWithdrawAmount.add(1))
       ).to.be.revertedWithCustomError(staker, "WithdrawalAmountTooLarge");
     });
 
     it("pass: withdraw output of maxWithdraw after depositing and accruing rewards", async () => {
       // reserve fund
-      await staker.connect(two).deposit(parseEther(10000), two.address);
+      await staker.connect(two).deposit(parseEther(10000));
       // deposit 5 MATIC
-      await staker.connect(one).deposit(parseEther(5), one.address);
+      await staker.connect(one).deposit(parseEther(5));
       // accrue
       await submitCheckpoint(0);
       // call max withdraw
       const maxWithdrawAmount = await staker.maxWithdraw(one.address);
       // withdraw output
-      await staker.connect(one).withdraw(maxWithdrawAmount, one.address, one.address);
+      await staker.connect(one).withdraw(maxWithdrawAmount);
     });
 
     it("fail: cannot withdraw 1 + output of maxWithdraw after depositing and accruing rewards", async () => {
       // deposit 5 MATIC
-      await staker.connect(one).deposit(parseEther(5), one.address);
+      await staker.connect(one).deposit(parseEther(5));
       // accrue
       await submitCheckpoint(0);
       // call max withdraw
       const maxWithdrawAmount = await staker.maxWithdraw(one.address);
       // withdraw output
       await expect(
-        staker.connect(one).withdraw(maxWithdrawAmount.add(1), one.address, one.address)
+        staker.connect(one).withdraw(maxWithdrawAmount.add(1))
       ).to.be.revertedWithCustomError(staker, "WithdrawalAmountTooLarge");
-    });
-
-    it("maxRedeem", async () => {
-      // no deposits
-      const maxRedeemOld = await staker.balanceOf(one.address);
-
-      expect(await staker.maxRedeem(one.address)).to.equal(maxRedeemOld);
-
-      // deposit 1M MATIC
-      await staker.connect(one).deposit(parseEther(1e6), one.address);
-
-      const maxRedeemNew = await staker.balanceOf(one.address);
-
-      expect(await staker.maxRedeem(one.address)).to.equal(maxRedeemNew);
     });
 
     it("preview functions circular check", async () => {
       // issue:
-      // - in max withdraw, balanceOf isturned into MATIC
+      // - in max withdraw, balanceOf is turned into MATIC
       // - in withdraw, amount is turned into TruMATIC
       // - this amount is larger than the original balanceOf amount
 
-      await staker.connect(one).deposit(parseEther(1e4), one.address);
+      await staker.connect(one).deposit(parseEther(1e4));
 
       for(let i = 0; i<5; i++){
         await submitCheckpoint(i);
+        const shareAmt = parseEther(1234); // in TruMATIC
+        const maticAmt = await staker.previewRedeem(shareAmt); // assets you'd get if you redeemed shares
+        const newShareAmt = await staker.previewWithdraw(maticAmt) // shares you'd get if you withdrew assets
 
-        // 1
-        const truMaticAmt1 = parseEther(1234); // in TruMATIC
-        const maticAmt1 = await staker.previewMint(truMaticAmt1); // convertToAssets, rounds up
-        const newTruMaticAmt1 = await staker.previewDeposit(maticAmt1); // convertToShares, rounds down
-
-        expect(truMaticAmt1).to.equal(newTruMaticAmt1);
-
-        // 2
-        const maticAmt2 = parseEther(1234); // in MATIC
-        const truMaticAmt2 = await staker.previewDeposit(maticAmt2); // shares you'd get if you deposited
-        const newMaticAmt2 = await staker.previewRedeem(truMaticAmt2); // amt you'd get if you withdrew
-        expect(maticAmt2).to.be.equal(newMaticAmt2);
+        expect(shareAmt).to.be.approximately(newShareAmt, 1); // off by 1 due to rounding up in previewRedeem
       }
     });
 
   });
 
-  describe("ERC-4626: getters + metadata", async () => {
+  describe("TruMATIC token: getters + metadata", async () => {
     it("name", async () => {
       expect(await staker.name()).to.equal(constants.NAME);
     });

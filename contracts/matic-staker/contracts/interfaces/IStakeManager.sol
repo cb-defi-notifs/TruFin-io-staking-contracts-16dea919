@@ -13,17 +13,9 @@ interface IStakeManager {
 
     function confirmAuctionBid(uint256 validatorId, uint256 heimdallFee) external;
 
-    function transferFunds(
-        uint256 validatorId,
-        uint256 amount,
-        address delegator
-    ) external returns (bool);
+    function transferFunds(uint256 validatorId, uint256 amount, address delegator) external returns (bool);
 
-    function delegationDeposit(
-        uint256 validatorId,
-        uint256 amount,
-        address delegator
-    ) external returns (bool);
+    function delegationDeposit(uint256 validatorId, uint256 amount, address delegator) external returns (bool);
 
     function unstake(uint256 validatorId) external;
 
@@ -49,7 +41,7 @@ interface IStakeManager {
 
     function decreaseValidatorDelegatedAmount(uint256 validatorId, uint256 amount) external;
 
-    function withdrawDelegatorsReward(uint256 validatorId) external returns(uint256);
+    function withdrawDelegatorsReward(uint256 validatorId) external returns (uint256);
 
     function dethroneAndStake(
         address auctionUser,
@@ -72,7 +64,7 @@ interface IStakeManager {
 
     function withdrawalDelay() external view returns (uint256);
 
-    function delegatedAmount(uint256 validatorId) external view returns(uint256);
+    function delegatedAmount(uint256 validatorId) external view returns (uint256);
 
-    function delegatorsReward(uint256 validatorId) external view returns(uint256);
+    function delegatorsReward(uint256 validatorId) external view returns (uint256);
 }

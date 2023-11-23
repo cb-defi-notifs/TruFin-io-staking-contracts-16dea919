@@ -3,7 +3,6 @@
 pragma solidity =0.8.19;
 
 // OpenZeppelin
-import {ERC4626Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
 import {IERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import {MathUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/math/MathUpgradeable.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
@@ -15,6 +14,7 @@ import {IValidatorShare} from "../interfaces/IValidatorShare.sol";
 import {IStakeManager} from "../interfaces/IStakeManager.sol";
 
 // TruFin
+import {ERC4626Storage} from "./ERC4626Storage.sol";
 import {ITruStakeMATICv2} from "../interfaces/ITruStakeMATICv2.sol";
 import {TruStakeMATICv2Storage} from "./TruStakeMATICv2Storage.sol";
 import {Withdrawal, Allocation, ValidatorState, Validator} from "./Types.sol";
@@ -30,9 +30,10 @@ contract TruStakeMATICv2 is
     ITruStakeMATICv2,
     OwnableUpgradeable,
     ReentrancyGuardUpgradeable,
-    ERC4626Upgradeable
+    ERC4626Storage
 {
     // *** LIBRARIES ***
+
     using SafeERC20Upgradeable for IERC20Upgradeable;
 
     // *** MODIFIERS ***
@@ -70,7 +71,6 @@ contract TruStakeMATICv2 is
         // Initialize derived state
         __ReentrancyGuard_init();
         __Ownable_init();
-        __ERC4626_init(IERC20Upgradeable(_stakingTokenAddress));
         __ERC20_init("TruStake MATIC Vault Shares", "TruMATIC");
 
         // Ensure addresses are non-zero
@@ -80,13 +80,9 @@ contract TruStakeMATICv2 is
         _checkNotZeroAddress(_whitelistAddress);
         _checkNotZeroAddress(_treasuryAddress);
 
-        if (_phi > PHI_PRECISION) {
-            revert PhiTooLarge();
-        }
+        if (_phi > PHI_PRECISION) revert PhiTooLarge();
 
-        if (_distPhi > PHI_PRECISION) {
-            revert DistPhiTooLarge();
-        }
+        if (_distPhi > PHI_PRECISION) revert DistPhiTooLarge();
 
         // Initialize contract state
         stakingTokenAddress = _stakingTokenAddress;
@@ -133,9 +129,8 @@ contract TruStakeMATICv2 is
     /// @param _validator New default validator to stake to and withdraw from.
     function setDefaultValidator(address _validator) external onlyOwner {
         _checkNotZeroAddress(_validator);
-        if (validators[_validator].state != ValidatorState.ENABLED) {
-            revert ValidatorNotEnabled();
-        }
+        if (validators[_validator].state != ValidatorState.ENABLED) revert ValidatorNotEnabled();
+
         emit SetDefaultValidator(defaultValidatorAddress, _validator);
         defaultValidatorAddress = _validator;
     }
@@ -143,9 +138,8 @@ contract TruStakeMATICv2 is
     /// @notice Sets the fee on certain actions within the protocol.
     /// @param _phi New fee cannot be larger than phi precision.
     function setPhi(uint256 _phi) external onlyOwner {
-        if (_phi > PHI_PRECISION) {
-            revert PhiTooLarge();
-        }
+        if (_phi > PHI_PRECISION) revert PhiTooLarge();
+
         emit SetPhi(phi, _phi);
         phi = _phi;
     }
@@ -153,9 +147,8 @@ contract TruStakeMATICv2 is
     /// @notice Sets the distribution fee.
     /// @param _distPhi New distribution fee.
     function setDistPhi(uint256 _distPhi) external onlyOwner {
-        if (_distPhi > PHI_PRECISION) {
-            revert DistPhiTooLarge();
-        }
+        if (_distPhi > PHI_PRECISION) revert DistPhiTooLarge();
+
         emit SetDistPhi(distPhi, _distPhi);
         distPhi = _distPhi;
     }
@@ -163,9 +156,8 @@ contract TruStakeMATICv2 is
     /// @notice Sets the epsilon for rounding.
     /// @param _epsilon Buffer amount for rounding.
     function setEpsilon(uint256 _epsilon) external onlyOwner {
-        if (_epsilon > MAX_EPSILON) {
-            revert EpsilonTooLarge();
-        }
+        if (_epsilon > MAX_EPSILON) revert EpsilonTooLarge();
+
         emit SetEpsilon(epsilon, _epsilon);
         epsilon = _epsilon;
     }
@@ -173,9 +165,8 @@ contract TruStakeMATICv2 is
     /// @notice Sets the lower deposit limit.
     /// @param _newMinDeposit New minimum amount of MATIC one has to deposit (default 1e18 = 1 MATIC).
     function setMinDeposit(uint256 _newMinDeposit) external onlyOwner {
-        if (_newMinDeposit < 1e18) {
-            revert MinDepositTooSmall();
-        }
+        if (_newMinDeposit < 1e18) revert MinDepositTooSmall();
+
         emit SetMinDeposit(minDeposit, _newMinDeposit);
         minDeposit = _newMinDeposit;
     }
@@ -187,13 +178,11 @@ contract TruStakeMATICv2 is
     function addValidator(address _validator) external onlyOwner {
         _checkNotZeroAddress(_validator);
 
-        if (validators[_validator].state != ValidatorState.NONE){
-            revert ValidatorAlreadyExists();
-        }
+        if (validators[_validator].state != ValidatorState.NONE) revert ValidatorAlreadyExists();
 
         validatorAddresses.push(_validator);
 
-        (uint256 stakedAmount,) = IValidatorShare(_validator).getTotalStake(address(this));
+        (uint256 stakedAmount, ) = IValidatorShare(_validator).getTotalStake(address(this));
         validators[_validator].state = ValidatorState.ENABLED;
         validators[_validator].stakedAmount = stakedAmount;
 
@@ -205,9 +194,7 @@ contract TruStakeMATICv2 is
     function disableValidator(address _validator) external onlyOwner {
         _checkNotZeroAddress(_validator);
 
-        if (validators[_validator].state != ValidatorState.ENABLED){
-            revert ValidatorNotEnabled();
-        }
+        if (validators[_validator].state != ValidatorState.ENABLED) revert ValidatorNotEnabled();
 
         validators[_validator].state = ValidatorState.DISABLED;
 
@@ -219,16 +206,14 @@ contract TruStakeMATICv2 is
     function enableValidator(address _validator) external onlyOwner {
         _checkNotZeroAddress(_validator);
 
-        if (validators[_validator].state != ValidatorState.DISABLED){
-            revert ValidatorNotDisabled();
-        }
+        if (validators[_validator].state != ValidatorState.DISABLED) revert ValidatorNotDisabled();
 
         validators[_validator].state = ValidatorState.ENABLED;
 
         emit ValidatorStateChanged(_validator, ValidatorState.DISABLED, ValidatorState.ENABLED);
     }
 
-        /// @notice Claims a previously requested and now unbonded withdrawal.
+    /// @notice Claims a previously requested and now unbonded withdrawal.
     /// @param _unbondNonce Nonce of the corresponding delegator unbond.
     /// @param _validator Address of the validator to claim the withdrawal from.
     function withdrawClaim(uint256 _unbondNonce, address _validator) external onlyWhitelist nonReentrant {
@@ -264,7 +249,7 @@ contract TruStakeMATICv2 is
         _restake();
 
         // if there is MATIC in the vault, stake it with the provided validator
-        if (totalAssetBalance > 0){
+        if (totalAssetBalance > 0) {
             if (validators[_validator].state != ValidatorState.ENABLED) {
                 revert ValidatorNotEnabled();
             }
@@ -273,9 +258,6 @@ contract TruStakeMATICv2 is
 
         // Minted shares are given to the treasury to effectively take a fee
         _mint(treasuryAddress, shareIncrease);
-
-        // Emitted for ERC4626 compliance
-        emit Deposit(msg.sender, treasuryAddress, 0, shareIncrease);
 
         emit RewardsCompounded(amountRestaked, shareIncrease);
     }
@@ -289,13 +271,9 @@ contract TruStakeMATICv2 is
         _checkNotZeroAddress(_recipient);
 
         // can only allocate up to allocator's balance
-        if (_amount > maxWithdraw(msg.sender)) {
-            revert InsufficientDistributorBalance();
-        }
+        if (_amount > maxWithdraw(msg.sender)) revert InsufficientDistributorBalance();
 
-        if (_amount < 1e18) {
-            revert AllocationUnderOneMATIC();
-        }
+        if (_amount < 1e18) revert AllocationUnderOneMATIC();
 
         // variables up here for stack too deep issues
         uint256 individualAmount;
@@ -335,7 +313,6 @@ contract TruStakeMATICv2 is
                         globalPriceNum,
                         MathUpgradeable.Rounding.Down
                     );
-
                 // rounding individual allocation share price denominator DOWN, in order to maximise the individual allocation share price
                 // which minimises the amount that is distributed in `distributeRewards()`
             }
@@ -410,21 +387,15 @@ contract TruStakeMATICv2 is
         uint256 individualSharePriceDenom = individualAllocation.sharePriceDenom;
         uint256 individualMaticAmount = individualAllocation.maticAmount;
 
-        if (individualMaticAmount == 0) {
-            revert AllocationNonExistent();
-        }
+        if (individualMaticAmount == 0) revert AllocationNonExistent();
 
-         if (individualMaticAmount < _amount) {
-            revert ExcessDeallocation();
-        }
+        if (individualMaticAmount < _amount) revert ExcessDeallocation();
 
         unchecked {
-           individualMaticAmount -= _amount;
+            individualMaticAmount -= _amount;
         }
 
-         if (individualMaticAmount < 1e18 && individualMaticAmount !=0 ) {
-            revert AllocationUnderOneMATIC();
-        }
+        if (individualMaticAmount < 1e18 && individualMaticAmount != 0) revert AllocationUnderOneMATIC();
 
         // check if this is a complete deallocation
         if (individualMaticAmount == 0) {
@@ -475,14 +446,7 @@ contract TruStakeMATICv2 is
             totalAllocated[msg.sender][false] = Allocation(totalAmount, totalPriceNum, totalPriceDenom);
         }
 
-        emit Deallocated(
-            msg.sender,
-            _recipient,
-            individualMaticAmount,
-            totalAmount,
-            totalPriceNum,
-            totalPriceDenom
-        );
+        emit Deallocated(msg.sender, _recipient, individualMaticAmount, totalAmount, totalPriceNum, totalPriceDenom);
     }
 
     /// @notice Distributes the rewards from the caller's allocations to all their recipients.
@@ -542,13 +506,11 @@ contract TruStakeMATICv2 is
     /// @return  A value indicating whether the unbond can be claimed.
     function isClaimable(uint256 _unbondNonce, address _validator) external view returns (bool) {
         // Get epoch at which unbonding of delegated MATIC was initiated
-        (, uint256 withdrawEpoch) = IValidatorShare(_validator).unbonds_new(
-            address(this),
-            _unbondNonce
-        );
+        (, uint256 withdrawEpoch) = IValidatorShare(_validator).unbonds_new(address(this), _unbondNonce);
 
         // Check required epochs have passed
-        bool epochsPassed = getCurrentEpoch() >= withdrawEpoch + IStakeManager(stakeManagerContractAddress).withdrawalDelay();
+        bool epochsPassed = getCurrentEpoch() >=
+            withdrawEpoch + IStakeManager(stakeManagerContractAddress).withdrawalDelay();
 
         bool withdrawalPresent = withdrawals[_validator][_unbondNonce].user != address(0);
 
@@ -558,130 +520,43 @@ contract TruStakeMATICv2 is
     // *** PUBLIC METHODS ***
     /// @notice Deposits an amount of caller->-vault approved MATIC into the vault.
     /// @param _assets The amount of MATIC to deposit.
-    /// @param _receiver The address to receive TruMATIC shares (must be caller to avoid reversion).
-    /// @dev Although the ERC-4626 standard stipulates an approved user should be able to call this function
-    /// on behalf of a different `_receiver`, this functionality is currently disabled in the TruMATICv2
-    /// contract as the share management system has not been designed for it. If use of this functionality is
-    /// attempted, the transaction will revert.
     /// @dev The MATIC is staked with the default validator.
     /// @return The resulting amount of TruMATIC shares minted to the caller.
-    function deposit(uint256 _assets, address _receiver) public override onlyWhitelist nonReentrant returns (uint256) {
-        if (msg.sender != _receiver) {
-            revert SenderAndOwnerMustBeReceiver();
-        }
-
-        _deposit(msg.sender, _assets, defaultValidatorAddress);
-
-        return previewDeposit(_assets);
+    function deposit(uint256 _assets) public onlyWhitelist nonReentrant returns (uint256) {
+        return _deposit(msg.sender, _assets, defaultValidatorAddress);
     }
 
     /// @notice Deposits an amount of caller->-vault approved MATIC into the vault.
     /// @param _assets The amount of MATIC to deposit.
     /// @param _validator Address of the validator you want to stake with.
     /// @return The resulting amount of TruMATIC shares minted to the caller.
-    function depositToSpecificValidator(uint256 _assets, address _validator) public onlyWhitelist nonReentrant returns (uint256) {
-        _deposit(msg.sender, _assets, _validator);
-
-        return previewDeposit(_assets);
-    }
-
-    /// @notice Mints an amount of vault shares to the caller.
-    /// @dev Requires equivalent value of MATIC to be approved to the vault by the caller (converted using current share price).
-    /// @param _shares The amount of shares to mint.
-    /// @param _receiver The address to receive said TruMATIC shares (must be caller to avoid reversion).
-    /// @dev Although the ERC-4626 standard stipulates an approved user should be able to call this function
-    /// on behalf of a different `_receiver`, this functionality is currently disabled in the TruMATICv2
-    /// contract as the share management system has not been designed for it. If use of this functionality is
-    /// attempted, the transaction will revert.
-    /// @dev The MATIC is staked with the default validator.
-    /// @return The resulting amount of MATIC deposited into the vault.
-    function mint(uint256 _shares, address _receiver) public override onlyWhitelist nonReentrant returns (uint256) {
-        if (msg.sender != _receiver) {
-            revert SenderAndOwnerMustBeReceiver();
-        }
-
-        uint256 assets = previewMint(_shares);
-
-        _deposit(msg.sender, assets, defaultValidatorAddress);
-
-        return assets;
+    function depositToSpecificValidator(
+        uint256 _assets,
+        address _validator
+    ) public onlyWhitelist nonReentrant returns (uint256) {
+        return _deposit(msg.sender, _assets, _validator);
     }
 
     /// @notice Initiates a withdrawal request for an amount of MATIC from the vault and burns corresponding TruMATIC shares.
     /// @param _assets The amount of MATIC to withdraw.
-    /// @param _receiver The address to receive the MATIC (must be caller to avoid reversion).
-    /// @param _user The address whose shares are to be burned (must be caller to avoid reversion).
-    /// @dev Although the ERC-4626 standard stipulates an approved user should be able to call this function
-    /// on behalf of a different `_receiver` or `_user`, this functionality is currently disabled in the TruMATICv2
-    /// contract as the share management system has not been designed for it. If use of this functionality is
-    /// attempted, the transaction will revert.
-    /// @dev Although the ERC-4626 standard stipulates that assets be transferred to the receiver in this function, it is
-    /// non-trivial to enforce both that functionality and the ability for users to pass in as a parameter the amount of
-    /// assets they'd like to withdraw (another stipulation of the standard). Therefore, that is not the case with this
-    /// function, and users will need to call `withdrawClaim(uint256)` following an unbonding period in order to receive
-    /// their assets.
     /// @dev The MATIC is unstaked from the default validator.
-    /// @return The resulting amount of TruMATIC shares burned from the caller.
-    function withdraw(
-        uint256 _assets,
-        address _receiver,
-        address _user
-    ) public override onlyWhitelist nonReentrant returns (uint256) {
-        if (msg.sender != _receiver || msg.sender != _user) {
-            revert SenderAndOwnerMustBeReceiver();
-        }
-
-        _withdrawRequest(msg.sender, _assets, defaultValidatorAddress);
-
-        return previewWithdraw(_assets);
+    /// @return The resulting amount of TruMATIC shares burned from the caller and the unbond nonce.
+    function withdraw(uint256 _assets) public onlyWhitelist nonReentrant returns (uint256, uint256) {
+        return _withdrawRequest(msg.sender, _assets, defaultValidatorAddress);
     }
 
     /// @notice Initiates a withdrawal request for an amount of MATIC from the vault
     /// and burns corresponding TruMATIC shares.
     /// @param _assets The amount of MATIC to withdraw.
     /// @param _validator The address of the validator from which to unstake.
-    /// @return The resulting amount of TruMATIC shares burned from the caller.
+    /// @return The resulting amount of TruMATIC shares burned from the caller and the unbond nonce.
     function withdrawFromSpecificValidator(
         uint256 _assets,
-        address _validator) public onlyWhitelist nonReentrant returns (uint256) {
-        if (validators[_validator].state == ValidatorState.NONE){
-            revert ValidatorDoesNotExist();
-        }
+        address _validator
+    ) public onlyWhitelist nonReentrant returns (uint256, uint256) {
+        if (validators[_validator].state == ValidatorState.NONE) revert ValidatorDoesNotExist();
 
-        _withdrawRequest(msg.sender, _assets, _validator);
-
-        return previewWithdraw(_assets);
-    }
-
-    /// @notice Initiates a withdrawal request for the underlying MATIC of an amount of TruMATIC shares from the vault.
-    /// @param _shares The amount of TruMATIC shares to redeem and burn.
-    /// @param _receiver The address to receive the underlying MATIC (must be caller to avoid reversion).
-    /// @param _user The address whose shares are to be burned (must be caller to avoid reversion).
-    /// @dev Although the ERC-4626 standard stipulates an approved user should be able to call this function
-    /// on behalf of a different `_receiver` or `_user`, this functionality is currently disabled in the TruMATICv2
-    /// contract as the share management system has not been designed for it. If use of this functionality is
-    /// attempted, the transaction will revert.
-    /// @dev Although the ERC-4626 standard stipulates that assets be transferred to the receiver in this function, it is
-    /// non-trivial to enforce both that functionality and the ability for users to pass in as a parameter the amount of
-    /// shares they'd like to withdraw (another stipulation of the standard). Therefore, that is not the case with this
-    /// function, and users will need to call `withdrawClaim(uint256)` following an unbonding period in order to receive
-    /// their assets.
-    /// @dev The MATIC is unstaked from the default validator.
-    /// @return The amount of MATIC scheduled for withdrawal from the vault.
-    function redeem(
-        uint256 _shares,
-        address _receiver,
-        address _user
-    ) public override onlyWhitelist nonReentrant returns (uint256) {
-        if (msg.sender != _receiver || msg.sender != _user) {
-            revert SenderAndOwnerMustBeReceiver();
-        }
-
-        uint256 assets = previewRedeem(_shares);
-
-        _withdrawRequest(msg.sender, assets, defaultValidatorAddress);
-
-        return assets;
+        return _withdrawRequest(msg.sender, _assets, _validator);
     }
 
     /// @notice Distributes allocation rewards from the caller to a recipient.
@@ -692,14 +567,20 @@ contract TruStakeMATICv2 is
     }
 
     /// *** PUBLIC VIEW METHODS ***
+    /// @notice Gets the total amount of MATIC currently held by the vault.
+    /// @return Total amount of MATIC held by the vault.
+    function totalAssets() public view returns (uint256) {
+        return IERC20Upgradeable(stakingTokenAddress).balanceOf(address(this));
+    }
+
     /// @notice Gets the total amount of MATIC currently staked by the vault.
     /// @return Total amount of MATIC staked by the vault across all validator delegations.
     function totalStaked() public view returns (uint256) {
         uint256 validatorCount = validatorAddresses.length;
         uint256 stake;
-        for (uint256 i; i < validatorCount;){
+        for (uint256 i; i < validatorCount; ) {
             stake += validators[validatorAddresses[i]].stakedAmount;
-            unchecked{
+            unchecked {
                 ++i;
             }
         }
@@ -711,9 +592,9 @@ contract TruStakeMATICv2 is
     function totalRewards() public view returns (uint256) {
         uint256 validatorCount = validatorAddresses.length;
         uint256 validatorRewards;
-        for (uint256 i; i < validatorCount;){
+        for (uint256 i; i < validatorCount; ) {
             validatorRewards += IValidatorShare(validatorAddresses[i]).getLiquidRewards(address(this));
-            unchecked{
+            unchecked {
                 ++i;
             }
         }
@@ -744,7 +625,7 @@ contract TruStakeMATICv2 is
     /// @return Current Polygon epoch.
     function getUserInfo(address _user) public view returns (uint256, uint256, uint256, uint256, uint256) {
         (uint256 globalPriceNum, uint256 globalPriceDenom) = sharePrice();
-        uint256 maxRedeemable = maxRedeem(_user);
+        uint256 maxRedeemable = balanceOf(_user);
         uint256 maxWithdrawAmount = maxWithdraw(_user);
         uint256 epoch = getCurrentEpoch();
 
@@ -753,15 +634,15 @@ contract TruStakeMATICv2 is
 
     /// @notice Retrieves information for all supported validators.
     /// @return An array of structs containing details for each validator.
-    function getAllValidators() public view returns (Validator[] memory){
+    function getAllValidators() public view returns (Validator[] memory) {
         uint256 validatorCount = validatorAddresses.length;
         Validator[] memory validatorArray = new Validator[](validatorCount);
-        for (uint256 i; i < validatorCount;){
+        for (uint256 i; i < validatorCount; ) {
             address validatorAddress = validatorAddresses[i];
             Validator memory validator = validators[validatorAddress];
             validator.validatorAddress = validatorAddress;
             validatorArray[i] = validator;
-            unchecked{
+            unchecked {
                 ++i;
             }
         }
@@ -798,59 +679,55 @@ contract TruStakeMATICv2 is
     /// @notice Gets the maximum amount of MATIC a user can withdraw from the vault.
     /// @param _user The user under consideration.
     /// @return The amount of MATIC.
-    function maxWithdraw(address _user) public view override returns (uint256) {
-        uint256 preview = previewRedeem(maxRedeem(_user));
+    function maxWithdraw(address _user) public view returns (uint256) {
+        uint256 preview = previewRedeem(balanceOf(_user));
 
-        if (preview == 0) {
-            return 0;
-        }
+        if (preview == 0) return 0;
 
         return preview + epsilon;
     }
 
-    /// @notice Anticipates the amount of MATIC someone can redeem based on the number of TruMATIC shares.
-    /// @param _shares The amount of TruMATIC to redeem MATIC for.
-    /// @inheritdoc ERC4626Upgradeable
-    function previewRedeem(uint256 _shares) public view override returns (uint256) {
+    /// @notice Returns the amount of TruMATIC needed to withdraw an amount of MATIC.
+    /// @dev Returns no fewer than the exact amount of TruMATIC that would be burned
+    /// in a withdraw request for the exact amount of MATIC.
+    /// @param _assets The exact amount of MATIC to withdraw.
+    /// @return The amount of TruMATIC burned.
+    function previewWithdraw(uint256 _assets) public view returns (uint256) {
+        return _convertToShares(_assets, MathUpgradeable.Rounding.Up);
+    }
+
+    /// @notice Returns the amount of MATIC that can be withdrawn for an amount of TruMATIC.
+    /// @dev Returns no fewer than the exact amount of MATIC that would be withdrawn
+    /// in a withdraw request that burns the exact amount of TruMATIC.
+    /// @param _shares The exact amount of TruMATIC to redeem.
+    /// @return The amount of MATIC withdrawn.
+    function previewRedeem(uint256 _shares) public view returns (uint256) {
         return _convertToAssets(_shares, MathUpgradeable.Rounding.Up);
     }
 
-    /// *** INTERNAL METHODS ***
-    /// @notice Internal function to convert MATIC to TruMATIC.
-    /// @dev Method overrides an ERC-4626 method and is used in ERC-4626 functions like the public convertToShares.
-    /// @param assets Assets in MATIC to be converted into TruMATIC.
-    function _convertToShares(
-        uint256 assets,
-        MathUpgradeable.Rounding rounding
-    ) internal view override returns (uint256) {
-        (uint256 globalPriceNum, uint256 globalPriceDenom) = sharePrice();
-        return MathUpgradeable.mulDiv(assets * 1e18, globalPriceDenom, globalPriceNum, rounding);
+    /// @notice Returns the amount of TruMATIC equivalent to an amount of MATIC.
+    /// @param _assets The amount of MATIC to convert.
+    /// @return The amount of TruMATIC that the Vault would exchange for the MATIC of assets provided.
+    function convertToShares(uint256 _assets) public view returns (uint256) {
+        return _convertToShares(_assets, MathUpgradeable.Rounding.Down);
     }
 
-    /// @notice Internal function to convert TruMATIC to MATIC.
-    /// @dev Method overrides an ERC-4626 method and is used in ERC-4626 functions like the public convertToAssets.
-    /// @param shares TruMATIC shares to be converted into MATIC.
-    function _convertToAssets(
-        uint256 shares,
-        MathUpgradeable.Rounding rounding
-    ) internal view override returns (uint256) {
-        (uint256 globalPriceNum, uint256 globalPriceDenom) = sharePrice();
-        return MathUpgradeable.mulDiv(shares, globalPriceNum, globalPriceDenom * 1e18, rounding);
+    /// @notice Returns the amount of MATIC equivalent to an amount of TruMATIC.
+    /// @param _shares The amount of TruMATIC to convert.
+    /// @return The amount of MATIC that the Vault would exchange for the amount of TruMATIC provided.
+    function convertToAssets(uint256 _shares) public view returns (uint256) {
+        return _convertToAssets(_shares, MathUpgradeable.Rounding.Down);
     }
 
     /// ***** PRIVATE METHODS *****
-    /// @notice Internal deposit function which stakes and mints shares for the user + treasury.
+    /// @notice Private deposit function which stakes and mints shares for the user + treasury.
     /// @param _user User depositing the amount.
     /// @param _amount Amount to be deposited.
     /// @param _validator Address of the validator to stake to.
-    function _deposit(address _user, uint256 _amount, address _validator) private {
-        if (_amount < minDeposit && _amount > 0) {
-            revert DepositBelowMinDeposit();
-        }
+    function _deposit(address _user, uint256 _amount, address _validator) private returns (uint256) {
+        if (_amount < minDeposit && _amount > 0) revert DepositBelowMinDeposit();
 
-        if (validators[_validator].state != ValidatorState.ENABLED) {
-            revert ValidatorNotEnabled();
-        }
+        if (validators[_validator].state != ValidatorState.ENABLED) revert ValidatorNotEnabled();
 
         (uint256 globalPriceNum, uint256 globalPriceDenom) = sharePrice();
 
@@ -862,15 +739,9 @@ contract TruStakeMATICv2 is
         uint256 totalAssetBalance = totalAssets();
         uint256 stakeAmount = _amount + totalAssetBalance;
         // adjust share balances
-        if (_user != address(0)) {
-            _mint(_user, shareIncreaseUser);
-            emit Deposit(_user, _user, _amount, shareIncreaseUser);
-            // erc-4626 event needed for integration
-        }
+        if (_user != address(0)) _mint(_user, shareIncreaseUser);
 
         _mint(treasuryAddress, shareIncreaseTsy);
-        emit Deposit(_user, treasuryAddress, 0, shareIncreaseTsy);
-        // erc-4626 event needed for integration
 
         // transfer staking token from user to Staker
         IERC20Upgradeable(stakingTokenAddress).safeTransferFrom(_user, address(this), _amount);
@@ -884,21 +755,19 @@ contract TruStakeMATICv2 is
         // are set to zero rewards and transferred to this vault
 
         emit Deposited(_user, shareIncreaseTsy, shareIncreaseUser, _amount, stakeAmount, totalAssetBalance, _validator);
+
+        return shareIncreaseUser;
     }
 
-    /// @notice Internal function to handle withdrawals and burning shares.
+    /// @notice Private function to handle withdrawals and burning shares.
     /// @param _user The user that is making the request.
     /// @param _amount The amount to be withdrawn.
     /// @param _validator Address of the validator to withdraw from.
-    function _withdrawRequest(address _user, uint256 _amount, address _validator) private {
-        if (_amount == 0) {
-            revert WithdrawalRequestAmountCannotEqualZero();
-        }
+    function _withdrawRequest(address _user, uint256 _amount, address _validator) private returns (uint256, uint256) {
+        if (_amount == 0) revert WithdrawalRequestAmountCannotEqualZero();
 
         uint256 maxWithdrawal = maxWithdraw(_user);
-        if (_amount > maxWithdrawal) {
-            revert WithdrawalAmountTooLarge();
-        }
+        if (_amount > maxWithdrawal) revert WithdrawalAmountTooLarge();
 
         (uint256 globalPriceNum, uint256 globalPriceDenom) = sharePrice();
 
@@ -909,26 +778,20 @@ contract TruStakeMATICv2 is
 
         // If remaining user balance is below 1 MATIC, entire balance is withdrawn and all shares
         // are burnt. We allow the user to withdraw their deposited amount + epsilon
-        uint256 remainingBalance = maxWithdrawal - _amount;
-        if (remainingBalance < 1e18){
+        if (maxWithdrawal - _amount < 1e18) {
             _amount = maxWithdrawal;
             shareDecreaseUser = balanceOf(_user);
         }
 
         _burn(_user, shareDecreaseUser);
-        emit Withdraw(_user, _user, _user, _amount, shareDecreaseUser); // erc-4626 event needed for integration
 
         _mint(treasuryAddress, shareIncreaseTsy);
-        emit Deposit(_user, treasuryAddress, 0, shareIncreaseTsy); // erc-4626 event needed for integration
 
         // interact with staking contract to initiate unbonding
         uint256 unbondNonce = _unbond(_amount, _validator);
 
         // store user under unbond nonce, used for fair claiming
         withdrawals[_validator][unbondNonce] = Withdrawal(_user, _amount);
-
-        // only once 80 epochs have passed can this be claimed
-        uint256 epoch = getCurrentEpoch();
 
         emit WithdrawalRequested(
             _user,
@@ -938,8 +801,10 @@ contract TruStakeMATICv2 is
             totalAssets(),
             _validator,
             unbondNonce,
-            epoch
+            getCurrentEpoch() // only once 80 epochs have passed can this be claimed
         );
+
+        return (shareDecreaseUser, unbondNonce);
     }
 
     /// @notice Handles withdraw claims internally according to unbond nonces (once unbonding period has passed).
@@ -949,20 +814,21 @@ contract TruStakeMATICv2 is
         Withdrawal memory withdrawal = withdrawals[_validator][_unbondNonce];
 
         // if the nonce is linked to a withdrawal in the current mapping, use that
-        if(withdrawal.user != address(0)){
+        if (withdrawal.user != address(0)) {
             delete withdrawals[_validator][_unbondNonce];
-        } else if(_validator == 0xeA077b10A0eD33e4F68Edb2655C18FDA38F84712 && unbondingWithdrawals[_unbondNonce].user != address(0)) {
+        } else if (
+            _validator == 0xeA077b10A0eD33e4F68Edb2655C18FDA38F84712 &&
+            unbondingWithdrawals[_unbondNonce].user != address(0)
+        ) {
             // else if the claim is for the twinstake staker, check the legacy mapping for the withdrawal
             withdrawal = unbondingWithdrawals[_unbondNonce];
             delete unbondingWithdrawals[_unbondNonce];
-        } else{
-             // else withdraw claim does not exist
+        } else {
+            // else withdraw claim does not exist
             revert WithdrawClaimNonExistent();
         }
 
-        if (withdrawal.user != msg.sender) {
-            revert SenderMustHaveInitiatedWithdrawalRequest();
-        }
+        if (withdrawal.user != msg.sender) revert SenderMustHaveInitiatedWithdrawalRequest();
 
         // claim will revert if unbonding not finished for this unbond nonce
         _claimStake(_unbondNonce, _validator);
@@ -971,7 +837,6 @@ contract TruStakeMATICv2 is
         IERC20Upgradeable(stakingTokenAddress).safeTransfer(msg.sender, withdrawal.amount);
 
         emit WithdrawalClaimed(msg.sender, _validator, _unbondNonce, withdrawal.amount);
-
     }
 
     /// @notice Validator function that transfers the _amount to the stake manager and stakes the assets onto the validator.
@@ -1003,7 +868,7 @@ contract TruStakeMATICv2 is
     /// @dev Logs a RestakeError event when an exception occurs while calling restake on a validator.
     function _restake() private {
         uint256 validatorCount = validatorAddresses.length;
-        for (uint256 i; i < validatorCount;){
+        for (uint256 i; i < validatorCount; ) {
             address validator = validatorAddresses[i];
             if (validators[validator].state == ValidatorState.ENABLED) {
                 // log an event on "Too small rewards to restake" and other exceptions
@@ -1028,9 +893,8 @@ contract TruStakeMATICv2 is
     function _distributeRewardsUpdateTotal(address _recipient, address _distributor, bool _inMatic) private {
         Allocation storage individualAllocation = allocations[_distributor][_recipient][false];
 
-        if (individualAllocation.maticAmount == 0) {
-            revert NothingToDistribute();
-        }
+        if (individualAllocation.maticAmount == 0) revert NothingToDistribute();
+
         Allocation storage totalAllocation = totalAllocated[_distributor][false];
         // moved up for stack too deep issues
         (uint256 globalPriceNum, uint256 globalPriceDenom) = sharePrice();
@@ -1063,8 +927,7 @@ contract TruStakeMATICv2 is
         uint256 totalAllocationSharePriceNum = totalAllocation.sharePriceNum;
 
         // update total allocated
-        uint256 newTotalAllocationSharePriceDenom =
-            totalAllocation.sharePriceDenom +
+        uint256 newTotalAllocationSharePriceDenom = totalAllocation.sharePriceDenom +
             MathUpgradeable.mulDiv(
                 individualAllocationMaticAmount * 1e22,
                 globalPriceDenom * totalAllocationSharePriceNum,
@@ -1116,7 +979,13 @@ contract TruStakeMATICv2 is
         // calculate amount of TruMatic to move from distributor to recipient
         uint256 sharesToMove;
         {
-            sharesToMove = MathUpgradeable.mulDiv(amt, individualAllocation.sharePriceDenom * 1e18, individualAllocation.sharePriceNum, MathUpgradeable.Rounding.Down) -
+            sharesToMove =
+                MathUpgradeable.mulDiv(
+                    amt,
+                    individualAllocation.sharePriceDenom * 1e18,
+                    individualAllocation.sharePriceNum,
+                    MathUpgradeable.Rounding.Down
+                ) -
                 MathUpgradeable.mulDiv(amt, globalPriceDenom * 1e18, globalPriceNum, MathUpgradeable.Rounding.Up);
 
             // calculate fees and transfer
@@ -1151,7 +1020,6 @@ contract TruStakeMATICv2 is
                 0
             );
         }
-
         return (oldNum, oldDenom, sharesToMove);
     }
 
@@ -1172,6 +1040,21 @@ contract TruStakeMATICv2 is
                 ++i;
             }
         }
+    }
+
+    /// ***** PRIVATE VIEW METHODS *****
+    /// @notice Private function to convert MATIC to TruMATIC.
+    /// @param assets Assets in MATIC to be converted into TruMATIC.
+    function _convertToShares(uint256 assets, MathUpgradeable.Rounding rounding) private view returns (uint256) {
+        (uint256 globalPriceNum, uint256 globalPriceDenom) = sharePrice();
+        return MathUpgradeable.mulDiv(assets * 1e18, globalPriceDenom, globalPriceNum, rounding);
+    }
+
+    /// @notice Private function to convert TruMATIC to MATIC.
+    /// @param shares TruMATIC shares to be converted into MATIC.
+    function _convertToAssets(uint256 shares, MathUpgradeable.Rounding rounding) private view returns (uint256) {
+        (uint256 globalPriceNum, uint256 globalPriceDenom) = sharePrice();
+        return MathUpgradeable.mulDiv(shares, globalPriceNum, globalPriceDenom * 1e18, rounding);
     }
 
     /// @notice Checks whether an address is the zero address.

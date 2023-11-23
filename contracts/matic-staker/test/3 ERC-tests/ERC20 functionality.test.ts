@@ -14,7 +14,7 @@ describe("TruMATIC ERC20 Functionality", () => {
     // reset to fixture
     ({ treasury, one, two, three, staker, deployer } = await loadFixture(deployment));
     TREASURY_INITIAL_DEPOSIT = parseEther(100);
-    await staker.connect(treasury).deposit(TREASURY_INITIAL_DEPOSIT, treasury.address);
+    await staker.connect(treasury).deposit(TREASURY_INITIAL_DEPOSIT);
   });
 
   it('has a name', async function () {
@@ -29,9 +29,9 @@ describe("TruMATIC ERC20 Functionality", () => {
     let totalStaked, totalSupply;
 
     beforeEach(async () => {
-      await staker.connect(three).deposit(parseEther(1000), three.address);
-      await staker.connect(one).deposit(parseEther(1000),one.address);
-      await staker.connect(two).deposit(parseEther(1000),two.address);
+      await staker.connect(three).deposit(parseEther(1000));
+      await staker.connect(one).deposit(parseEther(1000));
+      await staker.connect(two).deposit(parseEther(1000));
       totalStaked = await staker.totalStaked();
       totalSupply = await staker.totalSupply();
     });
@@ -58,7 +58,7 @@ describe("TruMATIC ERC20 Functionality", () => {
       const [globalSharePriceNumerator, globalSharePriceDenominator] = await staker.sharePrice();
 
       // deposit again to mint shares to treasury
-      await staker.connect(one).deposit(parseEther(1000),one.address)
+      await staker.connect(one).deposit(parseEther(1000))
       const newAmtStakedInTruMATIC = calculateSharesFromAmount(parseEther(1000),[globalSharePriceNumerator, globalSharePriceDenominator]);
       const trsyShares = calculateTrsyWithdrawFees(totalRewards,[globalSharePriceNumerator, globalSharePriceDenominator]);
 
@@ -70,8 +70,8 @@ describe("TruMATIC ERC20 Functionality", () => {
       const withdrawAmount = parseEther(1000);
 
       // withdraw
-      await staker.connect(one).withdraw(withdrawAmount,one.address,one.address);
-      await staker.connect(two).withdraw(withdrawAmount,two.address,two.address);
+      await staker.connect(one).withdraw(withdrawAmount);
+      await staker.connect(two).withdraw(withdrawAmount);
       expect(await staker.totalSupply()).to.equal(withdrawAmount.add(TREASURY_INITIAL_DEPOSIT));
       expect(await staker.balanceOf(one.address)).to.equal(0);
       expect(await staker.balanceOf(two.address)).to.equal(0);
@@ -87,12 +87,12 @@ describe("TruMATIC ERC20 Functionality", () => {
       const [globalSharePriceNumerator, globalSharePriceDenominator] = await staker.sharePrice();
 
       // Withdraw user 1
-      await staker.connect(one).withdraw(withdrawAmount,one.address,one.address);
+      await staker.connect(one).withdraw(withdrawAmount);
 
       // Treasury Shares
       const trsyShares = calculateTrsyWithdrawFees(totalRewards,[globalSharePriceNumerator,globalSharePriceDenominator])
 
-      await staker.connect(two).withdraw(withdrawAmount,two.address,two.address);
+      await staker.connect(two).withdraw(withdrawAmount);
       // expect the new totalSupply to be treasury deposit amount + user3 amount left + shares minted to treasury
       expect(await staker.totalSupply()).to.equal(TREASURY_INITIAL_DEPOSIT.add(withdrawAmount).add(trsyShares));
     })
@@ -101,12 +101,12 @@ describe("TruMATIC ERC20 Functionality", () => {
   describe("balanceOf",() => {
     it("correctly updates balances post deposit",async function() {
       expect(await staker.balanceOf(one.address)).to.equal(0);
-      await staker.connect(one).deposit(parseEther(2000),one.address);
+      await staker.connect(one).deposit(parseEther(2000));
       expect(await staker.balanceOf(one.address)).to.equal(parseEther(2000));
     });
 
     it("correctly updates sharePrice post reward accrual",async function() {
-      await staker.connect(one).deposit(parseEther(2000),one.address);
+      await staker.connect(one).deposit(parseEther(2000));
       let [globalSharePriceNumerator, globalSharePriceDenominator] = await staker.sharePrice();
       expect(globalSharePriceNumerator.div(globalSharePriceDenominator)).to.equal(parseEther(1));
 
@@ -120,7 +120,7 @@ describe("TruMATIC ERC20 Functionality", () => {
   describe("transfer", () => {
     it("correctly transfers post deposit", async function () {
       // deposit
-      await staker.connect(one).deposit(parseEther(2000), one.address);
+      await staker.connect(one).deposit(parseEther(2000));
 
       // check TruMATIC balances
       expect(await staker.balanceOf(two.address)).to.equal(0);
@@ -141,7 +141,7 @@ describe("TruMATIC ERC20 Functionality", () => {
 
     it("Transfer post allocation works", async function () {
       // deposit
-      await staker.connect(one).deposit(parseEther(2000), one.address);
+      await staker.connect(one).deposit(parseEther(2000));
       expect(await staker.balanceOf(two.address)).to.equal(parseEther(0));
       expect(await staker.balanceOf(one.address)).to.equal(parseEther(2000));
 
@@ -172,7 +172,7 @@ describe("TruMATIC ERC20 Functionality", () => {
 
     it("transferFrom after deposit works", async function () {
       // deposit
-      await staker.connect(one).deposit(allowance.mul(2), one.address);
+      await staker.connect(one).deposit(allowance.mul(2));
 
       // approve
       await staker.connect(one).approve(two.address, allowance);
@@ -186,7 +186,7 @@ describe("TruMATIC ERC20 Functionality", () => {
 
     it("transferFrom after allocation works", async function () {
       // deposit
-      await staker.connect(one).deposit(allowance.mul(2), one.address);
+      await staker.connect(one).deposit(allowance.mul(2));
 
       // allocate
       await staker.connect(one).allocate(parseEther(2000), two.address);
@@ -206,8 +206,8 @@ describe("TruMATIC ERC20 Functionality", () => {
     describe("totalSupply", () => {
       let totalSupply;
       beforeEach(async () => {
-        await staker.connect(one).deposit(parseEther(2000), one.address);
-        await staker.connect(two).deposit(parseEther(1000), two.address);
+        await staker.connect(one).deposit(parseEther(2000));
+        await staker.connect(two).deposit(parseEther(1000));
         totalSupply = await staker.totalSupply();
       });
 

@@ -2,27 +2,22 @@
 
 pragma solidity =0.8.19;
 
-import { TruStakeMATICv2 } from "../../contracts/main/TruStakeMATICv2.sol";
+import {TruStakeMATICv2} from "../../contracts/main/TruStakeMATICv2.sol";
 import {IValidatorShare} from "../../contracts/interfaces/IValidatorShare.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 // proof of concept reentrancy attack on TruStakeMATICv2 deposit function.
 
 contract MaliciousValidator_Deposit is IValidatorShare {
-
     TruStakeMATICv2 public staker;
     IERC20 public maticToken;
 
     uint256 halfDeposit;
 
-    constructor(
-        address _stakerAddress,
-        address _maticTokenAddress
-    ) {
+    constructor(address _stakerAddress, address _maticTokenAddress) {
         staker = TruStakeMATICv2(_stakerAddress);
         maticToken = IERC20(_maticTokenAddress);
     }
-
 
     function attack(uint amount) external payable {
         halfDeposit = amount / 2;
@@ -64,6 +59,4 @@ contract MaliciousValidator_Deposit is IValidatorShare {
     function exchangeRate() external view returns (uint256) {}
 
     function getTotalStake(address) external view returns (uint256, uint256) {}
-
 }
-

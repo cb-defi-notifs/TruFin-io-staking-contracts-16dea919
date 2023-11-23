@@ -29,7 +29,7 @@ describe("DISTRIBUTION", () => {
     } = await loadFixture(deployment));
 
     // Deposit to staker as allocatorOne
-    await staker.connect(allocatorOne).deposit(ALLOCATED_AMOUNT, allocatorOne.address);
+    await staker.connect(allocatorOne).deposit(ALLOCATED_AMOUNT);
 
     // Allocate that deposit to recipientOne as allocatorOne
     await staker.connect(allocatorOne).allocate(ALLOCATED_AMOUNT, recipientOne.address);
@@ -39,7 +39,7 @@ describe("DISTRIBUTION", () => {
     describe("distributeAll", async () => {
       beforeEach(async () => {
         // Deposit to staker as allocatorOne
-        await staker.connect(allocatorOne).deposit(ALLOCATED_AMOUNT, allocatorOne.address);
+        await staker.connect(allocatorOne).deposit(ALLOCATED_AMOUNT);
 
         // Allocate that deposit to recipientTwo as allocatorOne
         await staker.connect(allocatorOne).allocate(ALLOCATED_AMOUNT, recipientTwo.address);
@@ -286,7 +286,7 @@ describe("DISTRIBUTION", () => {
   it("Rewards earned via allocation equal rewards earned via deposit", async () => {
     // Make a deposit with a third party (not allocatorOne or recipientOne)
     // Depositor has an inital MATIC investment of ALLOCATED_AMOUNT
-    await staker.connect(depositor).deposit(ALLOCATED_AMOUNT, depositor.address);
+    await staker.connect(depositor).deposit(ALLOCATED_AMOUNT);
 
     // Accrue vault rewards
     await submitCheckpoint(0);
@@ -313,7 +313,7 @@ describe("DISTRIBUTION", () => {
   });
 
   it("Can withdraw allocated amount after distributeRewards call", async () => {
-    await staker.connect(recipientOne).deposit(parseEther(10), recipientOne.address);
+    await staker.connect(recipientOne).deposit(parseEther(10));
     // Accrue vault rewards
     await submitCheckpoint(0);
 
@@ -325,7 +325,7 @@ describe("DISTRIBUTION", () => {
     expect(userInfoBefore[1]).to.be.closeTo(ALLOCATED_AMOUNT.add(EPSILON), 1e0);
 
     // Ensure allocator can still claim their base allocation after distributing rewards to a single recipient
-    await staker.connect(allocatorOne).withdraw(ALLOCATED_AMOUNT, allocatorOne.address, allocatorOne.address);
+    await staker.connect(allocatorOne).withdraw(ALLOCATED_AMOUNT);
 
     // removed everything left in balance (including dust)
     const userInfo = await staker.getUserInfo(allocatorOne.address);
@@ -336,7 +336,7 @@ describe("DISTRIBUTION", () => {
 
   it("Can withdraw combined allocated amounts after distributeAll call", async () => {
     // Deposit ALLOCATED_AMOUNT MATIC again
-    await staker.connect(allocatorOne).deposit(ALLOCATED_AMOUNT, allocatorOne.address);
+    await staker.connect(allocatorOne).deposit(ALLOCATED_AMOUNT);
 
     // Make a second allocation
     await staker.connect(allocatorOne).allocate(ALLOCATED_AMOUNT, recipientTwo.address);
@@ -352,12 +352,12 @@ describe("DISTRIBUTION", () => {
     await submitCheckpoint(1);
 
     // Ensure allocator can still claim combined allocations after distributing rewards to all recipients
-    staker.connect(allocatorOne).withdraw(totalAllocation, allocatorOne.address, allocatorOne.address);
+    staker.connect(allocatorOne).withdraw(totalAllocation);
   });
 
   it("Multiple distributeRewards calls are equivalent to single distributeAll call", async () => {
     // Deposit ALLOCATED_AMOUNT MATIC again
-    await staker.connect(allocatorOne).deposit(ALLOCATED_AMOUNT, allocatorOne.address);
+    await staker.connect(allocatorOne).deposit(ALLOCATED_AMOUNT);
 
     // Make a second allocation as allocatorOne to recipientTwo
     await staker.connect(allocatorOne).allocate(ALLOCATED_AMOUNT, recipientTwo.address);
@@ -385,9 +385,9 @@ describe("DISTRIBUTION", () => {
     } = await loadFixture(deployment));
 
     // Perform same deposits and allocations made previously
-    await staker.connect(allocatorOne).deposit(ALLOCATED_AMOUNT, allocatorOne.address);
+    await staker.connect(allocatorOne).deposit(ALLOCATED_AMOUNT);
     await staker.connect(allocatorOne).allocate(ALLOCATED_AMOUNT, recipientOne.address);
-    await staker.connect(allocatorOne).deposit(ALLOCATED_AMOUNT, allocatorOne.address);
+    await staker.connect(allocatorOne).deposit(ALLOCATED_AMOUNT);
     await staker.connect(allocatorOne).allocate(ALLOCATED_AMOUNT, recipientTwo.address);
 
     // Accrue same vault rewards
@@ -429,7 +429,7 @@ describe("DISTRIBUTION", () => {
 
       it("The equivalent amount of TruMATIC is transferred to the user when distributing MATIC", async () => {
         // allocate to new user
-        await staker.connect(allocatorOne).deposit(ALLOCATED_AMOUNT, allocatorOne.address);
+        await staker.connect(allocatorOne).deposit(ALLOCATED_AMOUNT);
         await staker.connect(allocatorOne).allocate(ALLOCATED_AMOUNT, recipientTwo.address);
 
         // accrue rewards
@@ -474,7 +474,7 @@ describe("DISTRIBUTION", () => {
 
       it("The equivalent amount of TruMATIC is transferred to the user when distributing MATIC", async () => {
         // allocate to two new users
-        await staker.connect(allocatorOne).deposit(ALLOCATED_AMOUNT, allocatorOne.address);
+        await staker.connect(allocatorOne).deposit(ALLOCATED_AMOUNT);
         await staker.connect(allocatorOne).allocate(ALLOCATED_AMOUNT, recipientTwo.address);
         await staker.connect(allocatorOne).allocate(ALLOCATED_AMOUNT, depositor.address);
 

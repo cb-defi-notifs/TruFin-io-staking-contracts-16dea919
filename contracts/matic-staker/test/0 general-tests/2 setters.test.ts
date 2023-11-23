@@ -332,7 +332,7 @@ describe("Other", () => {
     });
     describe("allocate", async () => {
         it("Reverts with zero address", async () => {
-            await staker.connect(one).deposit(parseEther(20),one.address);
+            await staker.connect(one).deposit(parseEther(20));
             await expect(staker.connect(one).allocate(parseEther(10),ethers.constants.AddressZero)).to.be.revertedWithCustomError(staker,"ZeroAddressNotSupported");
         });
     });
