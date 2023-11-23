@@ -12,7 +12,7 @@ const parseEther = ethers.utils.parseEther;
 describe("Staker", () => {
     let deployer, treasury, one, two, three, // accounts
     token, validatorShare, stakeManager, whitelist, staker; // contracts
- 
+
   beforeEach(async () => {
     ({
       deployer, treasury, one, two, three,
@@ -26,9 +26,9 @@ describe("Staker", () => {
             const initialValue = parseEther("1");
             const attackValue = parseEther("10000");
             const depositValue = parseEther("10000");
-            await staker.connect(one).deposit(initialValue, one.address);
+            await staker.connect(one).deposit(initialValue);
             await token.connect(one).transfer(staker.address, attackValue);
-            await staker.connect(two).deposit(depositValue, two.address);
+            await staker.connect(two).deposit(depositValue);
             expect(await staker.balanceOf(one.address)).to.equal(initialValue);
             // The victim didn't receive zero shares
             expect(await staker.balanceOf(two.address)).to.be.greaterThan(0);

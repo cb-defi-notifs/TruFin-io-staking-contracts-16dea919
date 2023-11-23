@@ -1,12 +1,4 @@
-import { BigNumber, constants } from "ethers";
-
-import MaticTokenABI from "./abis/ethereum/MaticToken.json";
-import StakeManagerABI from "./abis/ethereum/StakeManager.json";
-import ValidatorShareABI from "./abis/ethereum/ValidatorShare.json";
-
-import GMaticTokenABI from "./abis/goerli/MaticToken.json";
-import GStakeManagerABI from "./abis/goerli/StakeManager.json";
-import GValidatorShareABI from "./abis/goerli/ValidatorShare.json";
+import { BigNumber } from "ethers";
 
 // --- Chain Config ---
 
@@ -54,22 +46,6 @@ export const WHITELIST_ADDRESS = {
     [CHAIN_ID.MUMBAI]: "0x0000000000000000000000000000000000000000",
 };
 
-// ABIs
-
-export const STAKING_TOKEN_ABI = {
-    [CHAIN_ID.ETH_MAINNET]: MaticTokenABI,
-    [CHAIN_ID.GOERLI]: GMaticTokenABI,
-}
-
-export const STAKE_MANAGER_ABI = {
-    [CHAIN_ID.ETH_MAINNET]: StakeManagerABI,
-    [CHAIN_ID.GOERLI]: GStakeManagerABI,
-};
-
-export const VALIDATOR_SHARE_ABI = {
-    [CHAIN_ID.ETH_MAINNET]: ValidatorShareABI,
-    [CHAIN_ID.GOERLI]: GValidatorShareABI,
-};
 
 // Other args
 export const EPSILON = BigNumber.from(1e4);
@@ -79,8 +55,6 @@ export const PHI = BigNumber.from(1000);
 export const DIST_PHI = BigNumber.from(500);
 
 export const PHI_PRECISION = BigNumber.from(10000);
-
-export const CAP = BigNumber.from(10).pow(6 + 18); // 1 MILLION MATIC
 
 export const NAME = "TruStake MATIC Vault Shares";
 

@@ -1,16 +1,13 @@
 import { expect } from "chai";
 import { ethers, upgrades } from "hardhat";
-import { BigNumber, Contract } from "ethers";
+import { smock } from '@defi-wonderland/smock';
 import { AddressZero } from "@ethersproject/constants";
 import * as helpers from "@nomicfoundation/hardhat-network-helpers";
 import * as constants from "../helpers/constants";
 
-const chainId = 1;
+const chainId = constants.DEFAULT_CHAIN_ID;
 
 const parseEther = ethers.utils.parseEther;
-const formatEther = ethers.utils.formatEther;
-const toBN = ethers.BigNumber.from;
-const ZERO_ADDRESS = ethers.constants.AddressZero;
 
 // needed because solidity div always rounds down
 const expectDivEqual = (a: any, b: any) => expect(a - b).to.be.oneOf([0, 1]);
@@ -45,38 +42,35 @@ const setTokenBalancesAndApprove = async (token, users, recipient, amount) => {
 };
 
 describe("Staker", () => {
-  let deployer, treasury, user1, user2;
+  let deployer, treasury, user1, user2, user3;
   let token, validatorShare, stakeManager, whitelist, staker;
   let snapshot: any;
 
   before(async () => {
     // load deployed contracts
     token = await ethers.getContractAt(
-      constants.STAKING_TOKEN_ABI[chainId],
+      constants.STAKING_TOKEN_ABI,
       constants.STAKING_TOKEN_ADDRESS[chainId]
     );
     validatorShare = await ethers.getContractAt(
-      constants.VALIDATOR_SHARE_ABI[chainId],
+      constants.VALIDATOR_SHARE_ABI,
       constants.VALIDATOR_SHARE_CONTRACT_ADDRESS[chainId]
     );
     stakeManager = await ethers.getContractAt(
-      constants.STAKE_MANAGER_ABI[chainId],
+      constants.STAKE_MANAGER_ABI,
       constants.STAKE_MANAGER_CONTRACT_ADDRESS[chainId]
     );
 
     // load signers, balances set to 10k ETH in hardhat config file
-    [deployer, treasury, user1, user2] = await ethers.getSigners();
+    [deployer, treasury, user1, user2, user3] = await ethers.getSigners();
 
-    // load factories and deployer staker and whitelist
-    whitelist = await ethers
-      .getContractFactory("MasterWhitelist")
-      .then((whitelistFactory) =>
-        upgrades.deployProxy(whitelistFactory, [
-          AddressZero, // _reader
-          AddressZero, // _registry
-          [], // _countryBlacklist
-        ])
-      );
+    // mock whitelist
+    whitelist = await smock.fake(constants.WHITELIST_ABI);
+
+    // add users to whitelist
+    whitelist.isUserWhitelisted.returns((params : [string]) => {
+      return [deployer, treasury, user1, user2].map(it => it.address).includes(params[0])
+    });
 
     staker = await ethers
       .getContractFactory("TruStakeMATICv2")
@@ -89,9 +83,11 @@ describe("Staker", () => {
           treasury.address,
           constants.PHI,
           constants.DIST_PHI,
-          constants.CAP,
         ])
       );
+
+    // make it the default validator
+    await staker.setDefaultValidator(validatorShare.address);
 
     // set each balance to 10k MATIC and approve it to staker
     await setTokenBalancesAndApprove(
@@ -101,14 +97,8 @@ describe("Staker", () => {
       parseEther("1000000")
     );
 
-    // add users to whitelist
-    await whitelist.connect(deployer).addUserToWhitelist(deployer.address);
-    await whitelist.connect(deployer).addUserToWhitelist(treasury.address);
-    await whitelist.connect(deployer).addUserToWhitelist(user1.address);
-    await whitelist.connect(deployer).addUserToWhitelist(user2.address);
-
     // treasury deposits first
-    await staker.connect(treasury).deposit(parseEther("100"), treasury.address);
+    await staker.connect(treasury).deposit(parseEther("100"));
 
     // save snapshot
     snapshot = await helpers.takeSnapshot();
@@ -120,17 +110,6 @@ describe("Staker", () => {
   });
 
   describe(`Setters`, async () => {
-
-    it(`Set validator share contract`, async () => {
-      const tx = await staker.setValidatorShareContract(deployer.address);
-
-      await expect(tx)
-        .to.emit(staker, "SetValidatorShareContract")
-        .withArgs(validatorShare.address, deployer.address);
-      expect(await staker.validatorShareContractAddress()).to.equal(
-        deployer.address
-      );
-    });
 
     it(`Set whitelist`, async () => {
       const tx = await staker.setWhitelist(deployer.address);
@@ -148,15 +127,6 @@ describe("Staker", () => {
         .to.emit(staker, "SetTreasury")
         .withArgs(treasury.address, deployer.address);
       expect(await staker.treasuryAddress()).to.equal(deployer.address);
-    });
-
-    it(`Set cap`, async () => {
-      const tx = await staker.setCap(parseEther("100"));
-
-      await expect(tx)
-        .to.emit(staker, "SetCap")
-        .withArgs(constants.CAP, parseEther("100"));
-      expect(await staker.cap()).to.equal(parseEther("100"));
     });
 
     it(`Set phi`, async () => {
@@ -181,17 +151,7 @@ describe("Staker", () => {
       // stake as user1
       const amount = parseEther("1000");
 
-      const tx = await staker.connect(user1).deposit(amount, user1.address);
-
-      await expect(tx).to.emit(staker, "Deposited");
-      expect(await staker.balanceOf(user1.address)).to.equal(amount);
-    });
-
-    it(`Mint`, async () => {
-      // stake as user1
-      const amount = parseEther("1000");
-
-      const tx = await staker.connect(user1).mint(amount, user1.address);
+      const tx = await staker.connect(user1).deposit(amount);
 
       await expect(tx).to.emit(staker, "Deposited");
       expect(await staker.balanceOf(user1.address)).to.equal(amount);
@@ -200,27 +160,14 @@ describe("Staker", () => {
     it(`Withdraw`, async () => {
       // stake as user1
       const amount = parseEther("1000");
-      await staker.connect(user1).deposit(amount, user1.address);
+      await staker.connect(user1).deposit(amount);
 
       const tx = await staker
         .connect(user1)
-        .withdraw(parseEther("1000"), user1.address, user1.address);
+        .withdraw(parseEther("1000"));
 
       await expect(tx).to.emit(staker, "WithdrawalRequested");
       expect(await staker.balanceOf(user1.address)).to.equal(0);
-    });
-
-    it(`Redeem`, async () => {
-      // stake as user1
-      const amount = parseEther("1000");
-      await staker.connect(user1).deposit(amount, user1.address);
-
-      const tx = await staker
-        .connect(user1)
-        .redeem(parseEther("500"), user1.address, user1.address);
-
-      await expect(tx).to.emit(staker, "WithdrawalRequested");
-      expect(await staker.balanceOf(user1.address)).to.equal(parseEther("500"));
     });
   });
 
@@ -228,39 +175,39 @@ describe("Staker", () => {
     it(`Allocate to user`, async () => {
       // stake as user1
       const amount = parseEther("1000");
-      await staker.connect(user1).deposit(amount, user1.address);
+      await staker.connect(user1).deposit(amount);
 
       // allocate
       const tx = await staker
         .connect(user1)
-        .allocate(parseEther("1000"), user2.address, false);
+        .allocate(parseEther("1000"), user2.address);
 
       await expect(tx).to.emit(staker, "Allocated");
-      
+
       const userAlloc = await staker.allocations(user1.address, user2.address, false);
       const sharePrice = userAlloc.sharePriceNum/userAlloc.sharePriceDenom;
       expect(userAlloc.maticAmount).to.equal(amount);
       expect(sharePrice).to.equal(1e18);
 
-      await staker.connect(user1).deposit(amount, user1.address);
+      await staker.connect(user1).deposit(amount);
       await staker
         .connect(user1)
-        .allocate(parseEther("100"), user2.address, false);
+        .allocate(parseEther("100"), user2.address);
     });
 
     it(`Deallocate from user`, async () => {
       // stake as user1
       const amount = parseEther("1000");
-      await staker.connect(user1).deposit(amount, user1.address);
+      await staker.connect(user1).deposit(amount);
 
       // allocate
       await staker
         .connect(user1)
-        .allocate(parseEther("1000"), user2.address, false);
+        .allocate(parseEther("1000"), user2.address);
 
       const tx = await staker
         .connect(user1)
-        .deallocate(parseEther("1000"), user2.address, false);
+        .deallocate(parseEther("1000"), user2.address);
 
       await expect(tx).to.emit(staker, "Deallocated");
       expect(
@@ -268,44 +215,19 @@ describe("Staker", () => {
       ).to.deep.equal([0, 0, 0]);
     });
 
-    it(`Reallocate to another user`, async () => {
-      // stake as user1
-      const amount = parseEther("1000");
-      await staker.connect(user1).deposit(amount, user1.address);
-
-      // allocate
-      await staker
-        .connect(user1)
-        .allocate(parseEther("1000"), user2.address, false);
-
-      const tx = await staker
-        .connect(user1)
-        .reallocate(user2.address, deployer.address);
-
-      await expect(tx).to.emit(staker, "Reallocated");
-      expect(
-        await staker.allocations(user1.address, user2.address, false)
-      ).to.deep.equal([0, 0, 0]);
-
-      const userAlloc = await staker.allocations(user1.address, deployer.address, false)
-      const sharePrice = userAlloc.sharePriceNum/userAlloc.sharePriceDenom;
-      expect(userAlloc.maticAmount).to.equal(amount);
-      expect(sharePrice).to.equal(1e18);
-    });
-
     it(`Distribute rewards`, async () => {
       // stake as user1 and user2
       const amount = parseEther("1000");
-      await staker.connect(user1).deposit(amount, user1.address);
-      await staker.connect(user2).deposit(amount, user2.address);
+      await staker.connect(user1).deposit(amount);
+      await staker.connect(user2).deposit(amount);
 
       // allocate
       await staker
         .connect(user1)
-        .allocate(parseEther("100"), user2.address, false);
+        .allocate(parseEther("100"), user2.address);
       await staker
         .connect(user1)
-        .allocate(parseEther("400"), user2.address, false);
+        .allocate(parseEther("400"), user2.address);
 
       await helpers.time.increase(100000000);
 
@@ -315,7 +237,7 @@ describe("Staker", () => {
 
       await staker
         .connect(user1)
-        .distributeRewards(user2.address, user1.address, false);
+        .distributeRewards(user2.address, false);
 
       const user2BalanceAfter = await staker.balanceOf(user2.address);
 
@@ -335,14 +257,13 @@ describe("Staker", () => {
           treasury.address,
           constants.PHI,
           constants.DIST_PHI,
-          constants.CAP
         )
       ).to.be.revertedWith("Initializable: contract is already initialized");
     });
 
-    it(`When not owner tries to set validator share contract`, async () => {
+    it(`When not owner tries to add a validator`, async () => {
       await expect(
-        staker.connect(user1).setValidatorShareContract(user1.address)
+        staker.connect(user1).addValidator(user1.address)
       ).to.be.revertedWith("Ownable: caller is not the owner");
     });
 
@@ -356,12 +277,6 @@ describe("Staker", () => {
       await expect(
         staker.connect(user1).setTreasury(user1.address)
       ).to.be.revertedWith("Ownable: caller is not the owner");
-    });
-
-    it(`When not owner tries to set cap`, async () => {
-      await expect(staker.connect(user1).setCap(100)).to.be.revertedWith(
-        "Ownable: caller is not the owner"
-      );
     });
 
     it(`When not owner tries to set phi`, async () => {
@@ -389,76 +304,38 @@ describe("Staker", () => {
     });
 
     it(`When not whitelisted user tries to allocate`, async () => {
-      await whitelist.removeUserFromWhitelist(user1.address);
-
       await expect(
-        staker.connect(user1).allocate(1, deployer.address, false)
+        staker.connect(user3).allocate(1, deployer.address)
       ).to.be.revertedWithCustomError(staker, "UserNotWhitelisted");
     });
 
     it(`When not whitelisted user tries to deallocate`, async () => {
-      await whitelist.removeUserFromWhitelist(user1.address);
-
       await expect(
-        staker.connect(user1).deallocate(1, deployer.address, false)
-      ).to.be.revertedWithCustomError(staker, "UserNotWhitelisted");
-    });
-
-    it(`When not whitelisted user tries to reallocate`, async () => {
-      await whitelist.removeUserFromWhitelist(user1.address);
-
-      await expect(
-        staker.connect(user1).reallocate(user1.address, deployer.address)
+        staker.connect(user3).deallocate(1, deployer.address)
       ).to.be.revertedWithCustomError(staker, "UserNotWhitelisted");
     });
 
     it(`When try to allocate 0 amount`, async () => {
       await expect(
-          staker.allocate(0, deployer.address, false)
+          staker.allocate(0, deployer.address)
       ).to.be.revertedWithCustomError(staker, "AllocationUnderOneMATIC");
     });
 
     it(`When try to deallocate`, async () => {
       await expect(
-        staker.deallocate(1, deployer.address, false)
-      ).to.be.revertedWithCustomError(staker, "NoRewardsAllocatedToRecipient");
-    });
-
-    it(`When try to reallocate if allocation not exists`, async () => {
-      await expect(
-        staker.reallocate(user1.address, deployer.address)
+        staker.deallocate(1, deployer.address)
       ).to.be.revertedWithCustomError(staker, "AllocationNonExistent");
     });
 
     it(`When not whitelisted user tries to deposit`, async () => {
-      await whitelist.removeUserFromWhitelist(user1.address);
-
       await expect(
-          staker.connect(user1).deposit(1, user1.address)
-      ).to.be.revertedWithCustomError(staker, "UserNotWhitelisted");
-    });
-
-    it(`When not whitelisted user tries to mint`, async () => {
-      await whitelist.removeUserFromWhitelist(user1.address);
-
-      await expect(
-          staker.connect(user1).mint(1, deployer.address)
+          staker.connect(user3).deposit(1)
       ).to.be.revertedWithCustomError(staker, "UserNotWhitelisted");
     });
 
     it(`When not whitelisted user tries to withdraw`, async () => {
-      await whitelist.removeUserFromWhitelist(user1.address);
-
       await expect(
-          staker.connect(user1).withdraw(1, user1.address, deployer.address)
-      ).to.be.revertedWithCustomError(staker, "UserNotWhitelisted");
-    });
-
-    it(`When not whitelisted user tries to redeem`, async () => {
-      await whitelist.removeUserFromWhitelist(user1.address);
-
-      await expect(
-          staker.connect(user1).redeem(1, user1.address, deployer.address)
+          staker.connect(user3).withdraw(1)
       ).to.be.revertedWithCustomError(staker, "UserNotWhitelisted");
     });
   });

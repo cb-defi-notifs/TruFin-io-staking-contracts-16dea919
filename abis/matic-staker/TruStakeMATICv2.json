@@ -16,17 +16,7 @@
   },
   {
     "inputs": [],
-    "name": "CapTooLow",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "DepositSurpassesVaultCap",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "DepositUnderOneMATIC",
+    "name": "DepositBelowMinDeposit",
     "type": "error"
   },
   {
@@ -41,11 +31,6 @@
   },
   {
     "inputs": [],
-    "name": "ExceedsUnallocatedBalance",
-    "type": "error"
-  },
-  {
-    "inputs": [],
     "name": "ExcessDeallocation",
     "type": "error"
   },
@@ -56,7 +41,7 @@
   },
   {
     "inputs": [],
-    "name": "NoRewardsAllocatedToRecipient",
+    "name": "MinDepositTooSmall",
     "type": "error"
   },
   {
@@ -66,17 +51,7 @@
   },
   {
     "inputs": [],
-    "name": "OnlyDistributorCanDistributeRewards",
-    "type": "error"
-  },
-  {
-    "inputs": [],
     "name": "PhiTooLarge",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "SenderAndOwnerMustBeReceiver",
     "type": "error"
   },
   {
@@ -86,12 +61,32 @@
   },
   {
     "inputs": [],
-    "name": "StrictAllocationDisabled",
+    "name": "UserNotWhitelisted",
     "type": "error"
   },
   {
     "inputs": [],
-    "name": "UserNotWhitelisted",
+    "name": "ValidatorAlreadyExists",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "ValidatorDoesNotExist",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "ValidatorNotDisabled",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "ValidatorNotEnabled",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "WithdrawClaimNonExistent",
     "type": "error"
   },
   {
@@ -159,12 +154,6 @@
         "internalType": "uint256",
         "name": "_totalDenom",
         "type": "uint256"
-      },
-      {
-        "indexed": true,
-        "internalType": "bool",
-        "name": "_strict",
-        "type": "bool"
       }
     ],
     "name": "Allocated",
@@ -233,46 +222,9 @@
         "internalType": "uint256",
         "name": "_totalDenom",
         "type": "uint256"
-      },
-      {
-        "indexed": true,
-        "internalType": "bool",
-        "name": "_strict",
-        "type": "bool"
       }
     ],
     "name": "Deallocated",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "address",
-        "name": "sender",
-        "type": "address"
-      },
-      {
-        "indexed": true,
-        "internalType": "address",
-        "name": "owner",
-        "type": "address"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "assets",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "shares",
-        "type": "uint256"
-      }
-    ],
-    "name": "Deposit",
     "type": "event"
   },
   {
@@ -313,6 +265,12 @@
         "internalType": "uint256",
         "name": "_totalAssets",
         "type": "uint256"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "_validator",
+        "type": "address"
       }
     ],
     "name": "Deposited",
@@ -338,12 +296,6 @@
         "internalType": "uint256",
         "name": "_curDenom",
         "type": "uint256"
-      },
-      {
-        "indexed": true,
-        "internalType": "bool",
-        "name": "_strict",
-        "type": "bool"
       }
     ],
     "name": "DistributedAll",
@@ -399,12 +351,6 @@
         "internalType": "uint256",
         "name": "_totalDenom",
         "type": "uint256"
-      },
-      {
-        "indexed": true,
-        "internalType": "bool",
-        "name": "_strict",
-        "type": "bool"
       }
     ],
     "name": "DistributedRewards",
@@ -448,41 +394,17 @@
       {
         "indexed": true,
         "internalType": "address",
-        "name": "_distributor",
-        "type": "address"
-      },
-      {
-        "indexed": true,
-        "internalType": "address",
-        "name": "_oldRecipient",
-        "type": "address"
-      },
-      {
-        "indexed": true,
-        "internalType": "address",
-        "name": "_newRecipient",
+        "name": "_validator",
         "type": "address"
       },
       {
         "indexed": false,
-        "internalType": "uint256",
-        "name": "_newAmount",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "_newNum",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "_newDenom",
-        "type": "uint256"
+        "internalType": "string",
+        "name": "_reason",
+        "type": "string"
       }
     ],
-    "name": "Reallocated",
+    "name": "RestakeError",
     "type": "event"
   },
   {
@@ -509,37 +431,18 @@
     "inputs": [
       {
         "indexed": true,
-        "internalType": "bool",
-        "name": "_oldAllowStrict",
-        "type": "bool"
+        "internalType": "address",
+        "name": "_oldDefaultValidator",
+        "type": "address"
       },
       {
         "indexed": true,
-        "internalType": "bool",
-        "name": "_newAllowStrict",
-        "type": "bool"
+        "internalType": "address",
+        "name": "_newDefaultValidator",
+        "type": "address"
       }
     ],
-    "name": "SetAllowStrict",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "uint256",
-        "name": "_oldCap",
-        "type": "uint256"
-      },
-      {
-        "indexed": true,
-        "internalType": "uint256",
-        "name": "_newCap",
-        "type": "uint256"
-      }
-    ],
-    "name": "SetCap",
+    "name": "SetDefaultValidator",
     "type": "event"
   },
   {
@@ -586,6 +489,25 @@
       {
         "indexed": true,
         "internalType": "uint256",
+        "name": "_oldMinDeposit",
+        "type": "uint256"
+      },
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "_newMinDeposit",
+        "type": "uint256"
+      }
+    ],
+    "name": "SetMinDeposit",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
         "name": "_oldPhi",
         "type": "uint256"
       },
@@ -616,25 +538,6 @@
       }
     ],
     "name": "SetTreasury",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "address",
-        "name": "_oldValidatorShareContract",
-        "type": "address"
-      },
-      {
-        "indexed": true,
-        "internalType": "address",
-        "name": "_newValidatorShareContract",
-        "type": "address"
-      }
-    ],
-    "name": "SetValidatorShareContract",
     "type": "event"
   },
   {
@@ -674,7 +577,7 @@
       {
         "indexed": false,
         "internalType": "address",
-        "name": "_validatorShareContractAddress",
+        "name": "_validator",
         "type": "address"
       },
       {
@@ -693,12 +596,6 @@
         "indexed": false,
         "internalType": "uint256",
         "name": "_phi",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "_cap",
         "type": "uint256"
       },
       {
@@ -742,35 +639,42 @@
       {
         "indexed": true,
         "internalType": "address",
-        "name": "sender",
-        "type": "address"
-      },
-      {
-        "indexed": true,
-        "internalType": "address",
-        "name": "receiver",
-        "type": "address"
-      },
-      {
-        "indexed": true,
-        "internalType": "address",
-        "name": "owner",
+        "name": "_validator",
         "type": "address"
       },
       {
         "indexed": false,
         "internalType": "uint256",
-        "name": "assets",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "shares",
+        "name": "_stakedAmount",
         "type": "uint256"
       }
     ],
-    "name": "Withdraw",
+    "name": "ValidatorAdded",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "_validator",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "enum ValidatorState",
+        "name": "_oldState",
+        "type": "uint8"
+      },
+      {
+        "indexed": true,
+        "internalType": "enum ValidatorState",
+        "name": "_newState",
+        "type": "uint8"
+      }
+    ],
+    "name": "ValidatorStateChanged",
     "type": "event"
   },
   {
@@ -780,6 +684,12 @@
         "indexed": true,
         "internalType": "address",
         "name": "_user",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "_validator",
         "type": "address"
       },
       {
@@ -833,6 +743,12 @@
       },
       {
         "indexed": true,
+        "internalType": "address",
+        "name": "_validator",
+        "type": "address"
+      },
+      {
+        "indexed": false,
         "internalType": "uint256",
         "name": "_unbondNonce",
         "type": "uint256"
@@ -850,6 +766,19 @@
   {
     "inputs": [
       {
+        "internalType": "address",
+        "name": "_validator",
+        "type": "address"
+      }
+    ],
+    "name": "addValidator",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
         "internalType": "uint256",
         "name": "_amount",
         "type": "uint256"
@@ -858,11 +787,6 @@
         "internalType": "address",
         "name": "_recipient",
         "type": "address"
-      },
-      {
-        "internalType": "bool",
-        "name": "_strict",
-        "type": "bool"
       }
     ],
     "name": "allocate",
@@ -904,19 +828,6 @@
         "internalType": "uint256",
         "name": "sharePriceDenom",
         "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "allowStrict",
-    "outputs": [
-      {
-        "internalType": "bool",
-        "name": "",
-        "type": "bool"
       }
     ],
     "stateMutability": "view",
@@ -971,19 +882,6 @@
     "type": "function"
   },
   {
-    "inputs": [],
-    "name": "asset",
-    "outputs": [
-      {
-        "internalType": "address",
-        "name": "",
-        "type": "address"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
     "inputs": [
       {
         "internalType": "address",
@@ -1003,24 +901,16 @@
     "type": "function"
   },
   {
-    "inputs": [],
-    "name": "cap",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
     "inputs": [
       {
         "internalType": "uint256[]",
         "name": "_unbondNonces",
         "type": "uint256[]"
+      },
+      {
+        "internalType": "address",
+        "name": "_validator",
+        "type": "address"
       }
     ],
     "name": "claimList",
@@ -1029,7 +919,13 @@
     "type": "function"
   },
   {
-    "inputs": [],
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_validator",
+        "type": "address"
+      }
+    ],
     "name": "compoundRewards",
     "outputs": [],
     "stateMutability": "nonpayable",
@@ -1039,7 +935,7 @@
     "inputs": [
       {
         "internalType": "uint256",
-        "name": "shares",
+        "name": "_shares",
         "type": "uint256"
       }
     ],
@@ -1058,7 +954,7 @@
     "inputs": [
       {
         "internalType": "uint256",
-        "name": "assets",
+        "name": "_assets",
         "type": "uint256"
       }
     ],
@@ -1084,11 +980,6 @@
         "internalType": "address",
         "name": "_recipient",
         "type": "address"
-      },
-      {
-        "internalType": "bool",
-        "name": "_strict",
-        "type": "bool"
       }
     ],
     "name": "deallocate",
@@ -1134,16 +1025,24 @@
     "type": "function"
   },
   {
+    "inputs": [],
+    "name": "defaultValidatorAddress",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
     "inputs": [
       {
         "internalType": "uint256",
         "name": "_assets",
         "type": "uint256"
-      },
-      {
-        "internalType": "address",
-        "name": "_receiver",
-        "type": "address"
       }
     ],
     "name": "deposit",
@@ -1154,6 +1053,69 @@
         "type": "uint256"
       }
     ],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_assets",
+        "type": "uint256"
+      },
+      {
+        "internalType": "address",
+        "name": "_validator",
+        "type": "address"
+      }
+    ],
+    "name": "depositToSpecificValidator",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "deprecated1",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "deprecated2",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_validator",
+        "type": "address"
+      }
+    ],
+    "name": "disableValidator",
+    "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
   },
@@ -1173,13 +1135,8 @@
   {
     "inputs": [
       {
-        "internalType": "address",
-        "name": "_distributor",
-        "type": "address"
-      },
-      {
         "internalType": "bool",
-        "name": "_strict",
+        "name": "_inMatic",
         "type": "bool"
       }
     ],
@@ -1196,13 +1153,8 @@
         "type": "address"
       },
       {
-        "internalType": "address",
-        "name": "_distributor",
-        "type": "address"
-      },
-      {
         "internalType": "bool",
-        "name": "_strict",
+        "name": "_inMatic",
         "type": "bool"
       }
     ],
@@ -1241,6 +1193,19 @@
     "type": "function"
   },
   {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_validator",
+        "type": "address"
+      }
+    ],
+    "name": "enableValidator",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
     "inputs": [],
     "name": "epsilon",
     "outputs": [
@@ -1248,6 +1213,36 @@
         "internalType": "uint256",
         "name": "",
         "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "getAllValidators",
+    "outputs": [
+      {
+        "components": [
+          {
+            "internalType": "enum ValidatorState",
+            "name": "state",
+            "type": "uint8"
+          },
+          {
+            "internalType": "uint256",
+            "name": "stakedAmount",
+            "type": "uint256"
+          },
+          {
+            "internalType": "address",
+            "name": "validatorAddress",
+            "type": "address"
+          }
+        ],
+        "internalType": "struct Validator[]",
+        "name": "",
+        "type": "tuple[]"
       }
     ],
     "stateMutability": "view",
@@ -1272,11 +1267,6 @@
         "internalType": "address",
         "name": "_user",
         "type": "address"
-      },
-      {
-        "internalType": "bool",
-        "name": "_strict",
-        "type": "bool"
       }
     ],
     "name": "getDistributors",
@@ -1309,11 +1299,6 @@
         "internalType": "address",
         "name": "_user",
         "type": "address"
-      },
-      {
-        "internalType": "bool",
-        "name": "_strict",
-        "type": "bool"
       }
     ],
     "name": "getRecipients",
@@ -1328,7 +1313,32 @@
     "type": "function"
   },
   {
-    "inputs": [],
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_validator",
+        "type": "address"
+      }
+    ],
+    "name": "getRewardsFromValidator",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_validator",
+        "type": "address"
+      }
+    ],
     "name": "getUnbondNonce",
     "outputs": [
       {
@@ -1380,6 +1390,19 @@
     "type": "function"
   },
   {
+    "inputs": [],
+    "name": "getValidators",
+    "outputs": [
+      {
+        "internalType": "address[]",
+        "name": "",
+        "type": "address[]"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
     "inputs": [
       {
         "internalType": "address",
@@ -1417,7 +1440,7 @@
       },
       {
         "internalType": "address",
-        "name": "_validatorShareContractAddress",
+        "name": "_validator",
         "type": "address"
       },
       {
@@ -1439,11 +1462,6 @@
         "internalType": "uint256",
         "name": "_distPhi",
         "type": "uint256"
-      },
-      {
-        "internalType": "uint256",
-        "name": "_cap",
-        "type": "uint256"
       }
     ],
     "name": "initialize",
@@ -1457,6 +1475,11 @@
         "internalType": "uint256",
         "name": "_unbondNonce",
         "type": "uint256"
+      },
+      {
+        "internalType": "address",
+        "name": "_validator",
+        "type": "address"
       }
     ],
     "name": "isClaimable",
@@ -1465,63 +1488,6 @@
         "internalType": "bool",
         "name": "",
         "type": "bool"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "",
-        "type": "address"
-      }
-    ],
-    "name": "maxDeposit",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "",
-        "type": "address"
-      }
-    ],
-    "name": "maxMint",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "_user",
-        "type": "address"
-      }
-    ],
-    "name": "maxRedeem",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
       }
     ],
     "stateMutability": "view",
@@ -1547,19 +1513,8 @@
     "type": "function"
   },
   {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "_shares",
-        "type": "uint256"
-      },
-      {
-        "internalType": "address",
-        "name": "_receiver",
-        "type": "address"
-      }
-    ],
-    "name": "mint",
+    "inputs": [],
+    "name": "minDeposit",
     "outputs": [
       {
         "internalType": "uint256",
@@ -1567,7 +1522,7 @@
         "type": "uint256"
       }
     ],
-    "stateMutability": "nonpayable",
+    "stateMutability": "view",
     "type": "function"
   },
   {
@@ -1613,44 +1568,6 @@
     "inputs": [
       {
         "internalType": "uint256",
-        "name": "assets",
-        "type": "uint256"
-      }
-    ],
-    "name": "previewDeposit",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "shares",
-        "type": "uint256"
-      }
-    ],
-    "name": "previewMint",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
         "name": "_shares",
         "type": "uint256"
       }
@@ -1670,7 +1587,7 @@
     "inputs": [
       {
         "internalType": "uint256",
-        "name": "assets",
+        "name": "_assets",
         "type": "uint256"
       }
     ],
@@ -1683,24 +1600,6 @@
       }
     ],
     "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "_oldRecipient",
-        "type": "address"
-      },
-      {
-        "internalType": "address",
-        "name": "_newRecipient",
-        "type": "address"
-      }
-    ],
-    "name": "reallocate",
-    "outputs": [],
-    "stateMutability": "nonpayable",
     "type": "function"
   },
   {
@@ -1733,35 +1632,6 @@
     "type": "function"
   },
   {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "_shares",
-        "type": "uint256"
-      },
-      {
-        "internalType": "address",
-        "name": "_receiver",
-        "type": "address"
-      },
-      {
-        "internalType": "address",
-        "name": "_user",
-        "type": "address"
-      }
-    ],
-    "name": "redeem",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
     "inputs": [],
     "name": "renounceOwnership",
     "outputs": [],
@@ -1771,25 +1641,12 @@
   {
     "inputs": [
       {
-        "internalType": "bool",
-        "name": "_allowStrict",
-        "type": "bool"
+        "internalType": "address",
+        "name": "_validator",
+        "type": "address"
       }
     ],
-    "name": "setAllowStrict",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "_cap",
-        "type": "uint256"
-      }
-    ],
-    "name": "setCap",
+    "name": "setDefaultValidator",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -1824,6 +1681,19 @@
     "inputs": [
       {
         "internalType": "uint256",
+        "name": "_newMinDeposit",
+        "type": "uint256"
+      }
+    ],
+    "name": "setMinDeposit",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
         "name": "_phi",
         "type": "uint256"
       }
@@ -1842,19 +1712,6 @@
       }
     ],
     "name": "setTreasury",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "_validatorShareContractAddress",
-        "type": "address"
-      }
-    ],
-    "name": "setValidatorShareContract",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -1888,13 +1745,6 @@
       }
     ],
     "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "stakeClaimedRewards",
-    "outputs": [],
-    "stateMutability": "nonpayable",
     "type": "function"
   },
   {
@@ -2126,12 +1976,47 @@
     "type": "function"
   },
   {
-    "inputs": [],
-    "name": "validatorShareContractAddress",
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "name": "validatorAddresses",
     "outputs": [
       {
         "internalType": "address",
         "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "name": "validators",
+    "outputs": [
+      {
+        "internalType": "enum ValidatorState",
+        "name": "state",
+        "type": "uint8"
+      },
+      {
+        "internalType": "uint256",
+        "name": "stakedAmount",
+        "type": "uint256"
+      },
+      {
+        "internalType": "address",
+        "name": "validatorAddress",
         "type": "address"
       }
     ],
@@ -2157,20 +2042,15 @@
         "internalType": "uint256",
         "name": "_assets",
         "type": "uint256"
-      },
-      {
-        "internalType": "address",
-        "name": "_receiver",
-        "type": "address"
-      },
-      {
-        "internalType": "address",
-        "name": "_user",
-        "type": "address"
       }
     ],
     "name": "withdraw",
     "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      },
       {
         "internalType": "uint256",
         "name": "",
@@ -2186,11 +2066,74 @@
         "internalType": "uint256",
         "name": "_unbondNonce",
         "type": "uint256"
+      },
+      {
+        "internalType": "address",
+        "name": "_validator",
+        "type": "address"
       }
     ],
     "name": "withdrawClaim",
     "outputs": [],
     "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_assets",
+        "type": "uint256"
+      },
+      {
+        "internalType": "address",
+        "name": "_validator",
+        "type": "address"
+      }
+    ],
+    "name": "withdrawFromSpecificValidator",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      },
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "name": "withdrawals",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "user",
+        "type": "address"
+      },
+      {
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
     "type": "function"
   }
 ]

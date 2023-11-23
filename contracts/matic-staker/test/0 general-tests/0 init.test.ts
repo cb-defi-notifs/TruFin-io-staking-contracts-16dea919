@@ -33,10 +33,11 @@ describe("INIT", () => {
         parseEther(1),
         BigNumber.from(1),
       ]);
+      expect(await staker.validatorAddresses(0)).to.equal(validatorShare.address);
       // todo: update this with new/all global vars
     });
 
-    it("validating initializer parameters", async () => {
+    it("reverts if phi is too large", async () => {
       await expect(
         ethers.getContractFactory("TruStakeMATICv2").then(
           (stakerFactory) => upgrades.deployProxy(stakerFactory, [
@@ -47,13 +48,27 @@ describe("INIT", () => {
             treasury.address,
             constants.PHI_PRECISION.add(1),
             constants.DIST_PHI,
-            constants.CAP
           ])
         )
       ).to.be.revertedWithCustomError(staker, "PhiTooLarge");
     });
-  });
 
+    it("reverts if distPhi is too large", async () => {
+      await expect(
+        ethers.getContractFactory("TruStakeMATICv2").then(
+          (stakerFactory) => upgrades.deployProxy(stakerFactory, [
+            token.address,
+            stakeManager.address,
+            validatorShare.address,
+            whitelist.address,
+            treasury.address,
+            constants.PHI,
+            constants.PHI_PRECISION.add(1),
+          ])
+        )
+      ).to.be.revertedWithCustomError(staker, "DistPhiTooLarge");
+    });
+  });
 
   describe("MODIFIERS", () => {
     it("onlyWhitelist", async () => {
@@ -65,7 +80,7 @@ describe("INIT", () => {
       await expect(
         staker
           .connect(zeroSigner)
-        ["deposit(uint256,address)"](parseEther(5000), AddressZero)
+          .deposit(parseEther(5000))
       ).to.be.revertedWithCustomError(staker, "UserNotWhitelisted");
 
       // stop impersonating non-whitelisted address
@@ -75,19 +90,6 @@ describe("INIT", () => {
 
 
   describe("SETTERS - events and ownable", () => {
-    it("setValidatorShareContract", async () => {
-      expect(await staker.validatorShareContractAddress()).to.equal(
-        validatorShare.address
-      );
-      await staker.connect(deployer).setValidatorShareContract(one.address);
-      expect(await staker.validatorShareContractAddress()).to.equal(
-        one.address
-      );
-
-      await expect(
-        staker.connect(one).setValidatorShareContract(one.address)
-      ).to.be.revertedWith("Ownable: caller is not the owner");
-    });
 
     it("setWhitelist", async () => {
       expect(await staker.whitelistAddress()).to.equal(whitelist.address);
@@ -106,16 +108,6 @@ describe("INIT", () => {
 
       await expect(
         staker.connect(one).setTreasury(one.address)
-      ).to.be.revertedWith("Ownable: caller is not the owner");
-    });
-
-    it("setCap", async () => {
-      expect(await staker.cap()).to.equal(constants.CAP);
-      await staker.connect(deployer).setCap(constants.CAP.mul(2));
-      expect(await staker.cap()).to.equal(constants.CAP.mul(2));
-
-      await expect(
-        staker.connect(one).setCap(constants.CAP.mul(2))
       ).to.be.revertedWith("Ownable: caller is not the owner");
     });
 
@@ -151,17 +143,7 @@ describe("INIT", () => {
       ).to.be.revertedWith("Ownable: caller is not the owner");
     });
 
-    it("owner successfully sets allowStrict flag", async () => {
-      expect(await staker.allowStrict()).to.equal(false);
-      await staker.connect(deployer).setAllowStrict(true);
-      expect(await staker.allowStrict()).to.equal(true);
-    });
-
-    it("non-owner setting allowStrict flag fails", async () => {
-      await expect(staker.connect(one).setAllowStrict(false)).to.be.revertedWith("Ownable: caller is not the owner");
-    });
-
-    it("owner successfully sets epsilon", async () => {
+    it("owner sets epsilon", async () => {
       expect(await staker.epsilon()).to.equal(1e4);
       await staker.connect(deployer).setEpsilon(1e6);
       expect(await staker.epsilon()).to.equal(1e6);
@@ -207,8 +189,7 @@ describe("INIT", () => {
       expect(await staker.balanceOf(three.address)).to.equal(BigNumber.from(0)); // legitimate user
 
       // deposit 1 wei as first malicious user (one)
-      // await staker.connect(one).deposit(BigNumber.from(1), one.address);
-      await staker.connect(one).deposit(depositAmount, one.address);
+      await staker.connect(one).deposit(depositAmount);
 
       // check new share price and balances are as expected
       expect(sharePriceEquality(await staker.sharePrice(), initSharePrice)).to.equal(true); // unchanged
@@ -216,7 +197,7 @@ describe("INIT", () => {
       expect(await staker.balanceOf(two.address)).to.equal(BigNumber.from(0)); // unchanged
       expect(await staker.balanceOf(three.address)).to.equal(BigNumber.from(0)); // unchanged
 
-      // send 10k matic as second malicious user (two)
+      // send 10k MATIC as second malicious user (two)
       await token.connect(two).transfer(staker.address, parseEther(10000));
 
       // log new share price and balances
@@ -232,22 +213,22 @@ describe("INIT", () => {
       // small enough to not cause problems
     });
 
-    it("fail: depositing under 1 matic", async () => {
+    it("fail: depositing under 1 MATIC", async () => {
       // try depositing 1 wei
       await expect(
-        staker.connect(one).deposit(BigNumber.from(1), one.address)
-      ).to.be.revertedWithCustomError(staker, "DepositUnderOneMATIC");
+        staker.connect(one).deposit(BigNumber.from(1))
+      ).to.be.revertedWithCustomError(staker, "DepositBelowMinDeposit");
 
       // try depositing 1e18 - 1 wei
       await expect(
-        staker.connect(one).deposit(parseEther(1).sub(BigNumber.from(1)), one.address)
-      ).to.be.revertedWithCustomError(staker, "DepositUnderOneMATIC");
+        staker.connect(one).deposit(parseEther(1).sub(BigNumber.from(1)))
+      ).to.be.revertedWithCustomError(staker, "DepositBelowMinDeposit");
     });
 
-    it("pass: successfully deposit 1 matic or more", async () => {
-      await staker.connect(one).deposit(parseEther(1), one.address);
+    it("pass: deposit 1 MATIC or more", async () => {
+      await staker.connect(one).deposit(parseEther(1));
 
-      await staker.connect(one).deposit(parseEther(1).add(BigNumber.from(1)), one.address);
+      await staker.connect(one).deposit(parseEther(1).add(BigNumber.from(1)));
     });
   });
 });

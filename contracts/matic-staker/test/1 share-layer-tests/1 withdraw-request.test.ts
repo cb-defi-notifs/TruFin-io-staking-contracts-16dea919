@@ -10,21 +10,21 @@ import { submitCheckpoint } from "../helpers/state-interaction";
 describe("WITHDRAW REQUEST", () => {
   // Initial state, deposits, rewards compounding already tested
 
-  let treasury, deployer, one, two, staker;
+  let treasury, deployer, one, two, nonWhitelistedUser, staker, validatorShare;
   let TREASURY_INITIAL_DEPOSIT;
 
   beforeEach(async () => {
     // reset to fixture
-    ({ treasury, deployer, one, two, staker } = await loadFixture(deployment));
+    ({ treasury, deployer, one, two, nonWhitelistedUser, staker, validatorShare } = await loadFixture(deployment));
     TREASURY_INITIAL_DEPOSIT = parseEther(100)
-    await staker.connect(treasury).deposit(TREASURY_INITIAL_DEPOSIT, treasury.address);
+    await staker.connect(treasury).deposit(TREASURY_INITIAL_DEPOSIT);
   });
 
   it("initiate a partial withdrawal", async () => {
     // Deposit 10000 with account one
-    await staker.connect(one).deposit(parseEther(10000), one.address);
+    await staker.connect(one).deposit(parseEther(10000));
     // Initiate withdrawal
-    await staker.connect(one).withdraw(parseEther(3000), one.address, one.address);
+    await staker.connect(one).withdraw(parseEther(3000));
 
     // Check vault values
     expect(await staker.totalStaked()).to.equal(parseEther(7000).add(TREASURY_INITIAL_DEPOSIT)); // should not have changed
@@ -32,18 +32,59 @@ describe("WITHDRAW REQUEST", () => {
     // Check user values
     expect(await staker.balanceOf(one.address)).to.equal(parseEther(7000));
 
-    let unbondNonce = await staker.getUnbondNonce();
-    let [user, amount] = await staker.unbondingWithdrawals(unbondNonce);
+    let unbondNonce = await staker.getUnbondNonce(validatorShare.address);
+    let [user, amount] = await staker.withdrawals(validatorShare.address, unbondNonce);
     expect(user).to.equal(one.address);
     expect(amount).to.equal(parseEther(3000));
   });
 
+  it("withdraw returns the burned shares and unbond nonce", async () => {
+    // Deposit 10000 with account one
+    await staker.connect(one).deposit(parseEther(10000));
+    // Initiate withdrawal
+    const [sharesBurned, unbondNonce] = await staker.connect(one).callStatic.withdraw(parseEther(3000));
+
+    // Verify the return values
+    expect(sharesBurned).to.equal(parseEther(3000));
+    expect(unbondNonce).to.equal(1);
+  });
+
+  it("initiate a partial withdrawal from a specific validator", async () => {
+    // Deposit 10000 with account one
+    await staker.connect(one).deposit(parseEther(10000));
+
+    // Initiate withdrawal from a specific validator
+    await staker.connect(one).withdrawFromSpecificValidator(parseEther(3000), validatorShare.address);
+
+    // Check vault values
+    expect(await staker.totalStaked()).to.equal(parseEther(7000).add(TREASURY_INITIAL_DEPOSIT)); // should not have changed
+
+    // Check user values
+    expect(await staker.balanceOf(one.address)).to.equal(parseEther(7000));
+
+    let unbondNonce = await staker.getUnbondNonce(validatorShare.address);
+    let [user, amount] = await staker.withdrawals(validatorShare.address, unbondNonce);
+    expect(user).to.equal(one.address);
+    expect(amount).to.equal(parseEther(3000));
+  });
+
+  it("withdraw from a specific validator returns the burned shares and unbond nonce", async () => {
+    // Deposit 10000 with account one
+    await staker.connect(one).deposit(parseEther(10000));
+    // Initiate withdrawal
+    const [sharesBurned, unbondNonce] = await staker.connect(one).callStatic.withdrawFromSpecificValidator(parseEther(3000), validatorShare.address);
+
+    // Verify the return values
+    expect(sharesBurned).to.equal(parseEther(3000));
+    expect(unbondNonce).to.equal(1);
+  });
+
   it("initiate a complete withdrawal", async () => {
     // Deposit 10000 with account one
-    await staker.connect(one).deposit(parseEther(10000), one.address);
+    await staker.connect(one).deposit(parseEther(10000));
 
     // Initiate withdrawal
-    await staker.connect(one).withdraw(parseEther(10000), one.address, one.address);
+    await staker.connect(one).withdraw(parseEther(10000));
 
     // Check vault values
     expect(await staker.totalStaked()).to.equal(parseEther(0).add(TREASURY_INITIAL_DEPOSIT).sub(constants.EPSILON)); // should not have changed
@@ -51,19 +92,38 @@ describe("WITHDRAW REQUEST", () => {
     // Check user values
     expect(await staker.balanceOf(one.address)).to.equal(parseEther(0));
 
-    let unbondNonce = await staker.getUnbondNonce();
-    let [user, amount] = await staker.unbondingWithdrawals(unbondNonce);
+    let unbondNonce = await staker.getUnbondNonce(validatorShare.address);
+    let [user, amount] = await staker.withdrawals(validatorShare.address, unbondNonce);
+    expect(user).to.equal(one.address);
+    expect(amount).to.equal(parseEther(10000).add(constants.EPSILON));
+  });
+
+  it("initiate a complete withdrawal from a specific validator", async () => {
+    // Deposit 10000 with account one
+    await staker.connect(one).deposit(parseEther(10000));
+
+    // Initiate withdrawal from a specific validator
+    await staker.connect(one).withdrawFromSpecificValidator(parseEther(10000), validatorShare.address);
+
+    // Check vault values
+    expect(await staker.totalStaked()).to.equal(parseEther(0).add(TREASURY_INITIAL_DEPOSIT).sub(constants.EPSILON)); // should not have changed
+
+    // Check user values
+    expect(await staker.balanceOf(one.address)).to.equal(parseEther(0));
+
+    let unbondNonce = await staker.getUnbondNonce(validatorShare.address);
+    let [user, amount] = await staker.withdrawals(validatorShare.address, unbondNonce);
     expect(user).to.equal(one.address);
     expect(amount).to.equal(parseEther(10000).add(constants.EPSILON));
   });
 
   it("initiate multiple partial withdrawals", async () => {
     // Deposit 10000 with account one
-    await staker.connect(one).deposit(parseEther(10000), one.address);
+    await staker.connect(one).deposit(parseEther(10000));
 
     // Testing summing of user pending withdrawals
-    await staker.connect(one).withdraw(parseEther(2000), one.address, one.address);
-    await staker.connect(one).withdraw(parseEther(5000), one.address, one.address);
+    await staker.connect(one).withdraw(parseEther(2000));
+    await staker.connect(one).withdraw(parseEther(5000));
 
     // Check vault values
     expect(await staker.totalStaked()).to.equal(parseEther(3000).add(TREASURY_INITIAL_DEPOSIT)); // should not have changed
@@ -71,17 +131,17 @@ describe("WITHDRAW REQUEST", () => {
     // Check user values
     expect(await staker.balanceOf(one.address)).to.equal(parseEther(3000));
 
-    let unbondNonce = await staker.getUnbondNonce();
-    let [user, amount] = await staker.unbondingWithdrawals(unbondNonce);
+    let unbondNonce = await staker.getUnbondNonce(validatorShare.address);
+    let [user, amount] = await staker.withdrawals(validatorShare.address, unbondNonce);
     expect(user).to.equal(one.address);
     expect(amount).to.equal(parseEther(5000));
   });
 
   it("initiate withdrawal with rewards wip", async () => {
     // Deposit 10M with account one
-    await staker.connect(one).deposit(parseEther(10e6), one.address);
+    await staker.connect(one).deposit(parseEther(10e6));
 
-    // Accrue rewards (about 26.6 matic)
+    // Accrue rewards (about 26.6 MATIC)
     await submitCheckpoint(0);
 
     // save some variables for checks
@@ -108,7 +168,7 @@ describe("WITHDRAW REQUEST", () => {
     expect(await staker.balanceOf(one.address)).to.equal(parseEther(10e6));
 
     // Initiate withdrawal
-    await staker.connect(one).withdraw(withdrawAmt, one.address, one.address);
+    await staker.connect(one).withdraw(withdrawAmt);
 
     // check vault + user variables post-request
     expect(divSharePrice(await staker.sharePrice())).to.equal(divSharePrice(sharePrice));
@@ -120,14 +180,14 @@ describe("WITHDRAW REQUEST", () => {
     expect(await staker.balanceOf(treasury.address)).to.equal(TREASURY_INITIAL_DEPOSIT.add(shareIncTsy));
 
     // check withdrawal struct state is correct
-    let unbondNonce = await staker.getUnbondNonce();
-    let [user, amount] = await staker.unbondingWithdrawals(unbondNonce);
+    let unbondNonce = await staker.getUnbondNonce(validatorShare.address);
+    let [user, amount] = await staker.withdrawals(validatorShare.address, unbondNonce);
     expect(user).to.equal(one.address);
     expect(amount).to.equal(parseEther(3e6));
   });
 
   it("try initiating a withdrawal of size zero", async () => {
-    await expect(staker.connect(one).withdraw(parseEther(0), one.address, one.address)).to.be.revertedWithCustomError(
+    await expect(staker.connect(one).withdraw(parseEther(0))).to.be.revertedWithCustomError(
       staker,
       "WithdrawalRequestAmountCannotEqualZero"
     );
@@ -135,27 +195,25 @@ describe("WITHDRAW REQUEST", () => {
 
   it("try initiating withdrawal of more than deposited", async () => {
     // Deposit 10M with account one
-    await staker.connect(one).deposit(parseEther(10e6), one.address);
+    await staker.connect(one).deposit(parseEther(10e6));
 
     await expect(
-      staker.connect(one).withdraw(parseEther(15e6), one.address, one.address)
+      staker.connect(one).withdraw(parseEther(15e6))
     ).to.be.revertedWithCustomError(staker, "WithdrawalAmountTooLarge");
   });
 
-  it("Withdraw of strictly-allocated funds blocked", async () => {
-    // Enable strict allocation
-    await staker.connect(deployer).setAllowStrict(true);
+  it("try initiating withdrawal from a non existent validator", async () => {
+    // Deposit 10M with account one
+    await staker.connect(one).deposit(parseEther(10e6));
 
-    // Deposit as one
-    await staker.connect(one).deposit(parseEther(10000), one.address);
+    await expect(
+      staker.connect(one).withdrawFromSpecificValidator(parseEther(1000), one.address)
+    ).to.be.revertedWithCustomError(staker, "ValidatorDoesNotExist");
+  });
 
-    // Strictly allocate to two
-    await staker.connect(one).allocate(parseEther(10000), two.address, true);
-
-    // Attempt to make a withdrawal request of strictly-allocated funds
-    await expect(staker.connect(one).withdraw(1, one.address, one.address)).to.be.revertedWithCustomError(
-      staker,
-      "WithdrawalAmountTooLarge"
-    );
+  it("try initiating a withdrawal from a specific validator with a non-whitelisted user", async () => {
+    await expect(
+      staker.connect(nonWhitelistedUser).withdrawFromSpecificValidator(parseEther(1000), one.address)
+    ).to.be.revertedWithCustomError(staker, "UserNotWhitelisted");
   });
 });

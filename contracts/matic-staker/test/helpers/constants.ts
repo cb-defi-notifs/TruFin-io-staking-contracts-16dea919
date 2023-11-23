@@ -1,13 +1,9 @@
 import { BigNumber } from "ethers";
 
-import MaticTokenABI from "../../constants/abis/ethereum/MaticToken.json";
-import StakeManagerABI from "../../constants/abis/ethereum/StakeManager.json";
-import ValidatorShareABI from "../../constants/abis/ethereum/ValidatorShare.json";
-
-import GMaticTokenABI from "../../constants/abis/goerli/MaticToken.json";
-import GStakeManagerABI from "../../constants/abis/goerli/StakeManager.json";
-import GValidatorShareABI from "../../constants/abis/goerli/ValidatorShare.json";
-
+import MaticTokenABI from "../../../../abis/external/MaticToken.json";
+import StakeManagerABI from "../../../../abis/external/StakeManager.json";
+import ValidatorShareABI from "../../../../abis/external/ValidatorShare.json";
+import WhitelistABI from "../../../../abis/whitelist/MasterWhitelist.json";
 
 // --- Chain Config ---
 
@@ -55,28 +51,33 @@ export const VALIDATOR_SHARE_CONTRACT_ADDRESS = {
     [CHAIN_ID.MUMBAI]: "0x0000000000000000000000000000000000000000",
 };
 
+export const VALIDATOR_SHARE_2_CONTRACT_ADDRESS = {
+    [CHAIN_ID.ETH_MAINNET]: "0xeA077b10A0eD33e4F68Edb2655C18FDA38F84712",
+    [CHAIN_ID.GOERLI]: "0x0000000000000000000000000000000000000000",
+    [CHAIN_ID.MUMBAI]: "0x0000000000000000000000000000000000000000",
+};
+
 export const WHITELIST_ADDRESS = {
-    [CHAIN_ID.ETH_MAINNET]: "0x5701773567A4A903eF1DE459D0b542AdB2439937", // constants.AddressZero,
+    [CHAIN_ID.ETH_MAINNET]: "0x5701773567A4A903eF1DE459D0b542AdB2439937",
     [CHAIN_ID.GOERLI]: "0x936F07f9D34aEc897Df3475D386211B7Db2564Eb",
     [CHAIN_ID.MUMBAI]: "0x0000000000000000000000000000000000000000",
 };
 
+export const STAKER_ADDRESS = {
+  [CHAIN_ID.ETH_MAINNET]: "0xA43A7c62D56dF036C187E1966c03E2799d8987ed",
+  [CHAIN_ID.GOERLI]: "0x0ce41d234f5E3000a38c5EEF115bB4D14C9E1c89",
+  [CHAIN_ID.MUMBAI]: "0x0000000000000000000000000000000000000000",
+};
+
 // ABIs
 
-export const STAKING_TOKEN_ABI = {
-    [CHAIN_ID.ETH_MAINNET]: MaticTokenABI,
-    [CHAIN_ID.GOERLI]: GMaticTokenABI,
-}
+export const STAKING_TOKEN_ABI = MaticTokenABI;
 
-export const STAKE_MANAGER_ABI = {
-    [CHAIN_ID.ETH_MAINNET]: StakeManagerABI,
-    [CHAIN_ID.GOERLI]: GStakeManagerABI,
-};
+export const STAKE_MANAGER_ABI = StakeManagerABI;
 
-export const VALIDATOR_SHARE_ABI = {
-    [CHAIN_ID.ETH_MAINNET]: ValidatorShareABI,
-    [CHAIN_ID.GOERLI]: GValidatorShareABI,
-};
+export const VALIDATOR_SHARE_ABI = ValidatorShareABI;
+
+export const WHITELIST_ABI = WhitelistABI;
 
 // Other args
 export const EPSILON = BigNumber.from(1e4);
@@ -87,8 +88,12 @@ export const DIST_PHI = BigNumber.from(500);
 
 export const PHI_PRECISION = BigNumber.from(10000);
 
-export const CAP = BigNumber.from(10).pow(10 + 18); // 1 MILLION MATIC
-
 export const NAME = "TruStake MATIC Vault Shares";
 
 export const SYMBOL = "TruMATIC";
+
+export enum VALIDATOR_STATE {
+  NONE = 0,
+  ENABLED = 1,
+  DISABLED = 2,
+};

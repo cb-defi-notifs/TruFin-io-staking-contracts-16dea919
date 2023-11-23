@@ -77,23 +77,12 @@ export const setRewardPerStake = async (
   );
 };
 
-export const mintAndApprove = async (
-  token: Contract,
-  approver: SignerWithAddress,
-  recipient: SignerWithAddress,
-  amount: BigNumber
-): Promise<BigNumber> => {
-  return token
-    .mint(approver.address, amount)
-    .then(token.connect(approver).approve(recipient.address, amount));
-};
-
 // We copy consecutive checkpoint submission transactions after the mainnet fork time (see hardhat network's config)
 // We fork to one block before the first checkpoint submission transaction - 17335505
 // We then allow testers to submit them by specifying an index => 0, 1, 2...
 // The submitters and the transaction datas are in order in the checkpointSubmissions array
 // The submission will revert if the indexes are out of order
-// To get more checkpoint submissions => add new subsequent checkpoint submission transactions to the array 
+// To get more checkpoint submissions => add new subsequent checkpoint submission transactions to the array
 
 export const submitCheckpoint = async (index: number): Promise<void> => {
   const checkpointSubmission = checkpointSubmissions[index];

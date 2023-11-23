@@ -13,21 +13,11 @@ interface IStakeManager {
 
     function confirmAuctionBid(uint256 validatorId, uint256 heimdallFee) external;
 
-    function transferFunds(
-        uint256 validatorId,
-        uint256 amount,
-        address delegator
-    ) external returns (bool);
+    function transferFunds(uint256 validatorId, uint256 amount, address delegator) external returns (bool);
 
-    function delegationDeposit(
-        uint256 validatorId,
-        uint256 amount,
-        address delegator
-    ) external returns (bool);
+    function delegationDeposit(uint256 validatorId, uint256 amount, address delegator) external returns (bool);
 
     function unstake(uint256 validatorId) external;
-
-    function totalStakedFor(address addr) external view returns (uint256);
 
     function stakeFor(
         address user,
@@ -47,25 +37,11 @@ interface IStakeManager {
 
     function updateValidatorState(uint256 validatorId, int256 amount) external;
 
-    function ownerOf(uint256 tokenId) external view returns (address);
-
     function slash(bytes calldata slashingInfoList) external returns (uint256);
-
-    function validatorStake(uint256 validatorId) external view returns (uint256);
-
-    function epoch() external view returns (uint256);
-
-    function getRegistry() external view returns (address);
-
-    function withdrawalDelay() external view returns (uint256);
-
-    function delegatedAmount(uint256 validatorId) external view returns(uint256);
 
     function decreaseValidatorDelegatedAmount(uint256 validatorId, uint256 amount) external;
 
-    function withdrawDelegatorsReward(uint256 validatorId) external returns(uint256);
-
-    function delegatorsReward(uint256 validatorId) external view returns(uint256);
+    function withdrawDelegatorsReward(uint256 validatorId) external returns (uint256);
 
     function dethroneAndStake(
         address auctionUser,
@@ -75,4 +51,20 @@ interface IStakeManager {
         bool acceptDelegation,
         bytes calldata signerPubkey
     ) external;
+
+    function totalStakedFor(address addr) external view returns (uint256);
+
+    function ownerOf(uint256 tokenId) external view returns (address);
+
+    function validatorStake(uint256 validatorId) external view returns (uint256);
+
+    function epoch() external view returns (uint256);
+
+    function getRegistry() external view returns (address);
+
+    function withdrawalDelay() external view returns (uint256);
+
+    function delegatedAmount(uint256 validatorId) external view returns (uint256);
+
+    function delegatorsReward(uint256 validatorId) external view returns (uint256);
 }
