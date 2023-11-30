@@ -114,7 +114,7 @@ describe("Scenario -- Check storage after allocate/deallocate", () => {
             expect(await staker.getDistributors(user2.address)).to.deep.equal([user1.address]);
             expect(await staker.getRecipients(user1.address)).to.deep.equal([user2.address]);
             expect(await staker.allocations(user1.address, user2.address, false)).to.deep.equal([parseEther("500"), sharePrice[0], sharePrice[1]]);
-            expect(await staker.totalAllocated(user1.address, false)).to.deep.equal([parseEther("500"), sharePrice[0], sharePrice[1]]);
+            expect(await staker.getTotalAllocated(user1.address)).to.deep.equal([parseEther("500"), sharePrice[0], sharePrice[1]]);
         });
 
         it(`Allocate user1 -> deployer`, async () => {
@@ -124,7 +124,7 @@ describe("Scenario -- Check storage after allocate/deallocate", () => {
             expect(await staker.getDistributors(deployer.address)).to.deep.equal([user1.address]);
             expect(await staker.getRecipients(user1.address)).to.deep.equal([user2.address, deployer.address]);
             expect(await staker.allocations(user1.address, deployer.address, false)).to.deep.equal([parseEther("500"), sharePrice[0], sharePrice[1]]);
-            expect(await staker.totalAllocated(user1.address, false)).to.deep.equal([parseEther("1000"), parseEther("10000000000000000000000000"), parseEther("10000000")]);
+            expect(await staker.getTotalAllocated(user1.address)).to.deep.equal([parseEther("1000"), parseEther("10000000000000000000000000"), parseEther("10000000")]);
         });
 
         it(`Deallocate half user1 -> user2`, async () => {
@@ -134,7 +134,7 @@ describe("Scenario -- Check storage after allocate/deallocate", () => {
             expect(await staker.getDistributors(user2.address)).to.deep.equal([user1.address]);
             expect(await staker.getRecipients(user1.address)).to.deep.equal([user2.address, deployer.address]);
             expect(await staker.allocations(user1.address, user2.address, false)).to.deep.equal([parseEther("250"), sharePrice[0], sharePrice[1]]);
-            expect(await staker.totalAllocated(user1.address, false)).to.deep.equal([parseEther("750"), parseEther("100000000000000000000000").mul(75), parseEther("7500000")]);
+            expect(await staker.getTotalAllocated(user1.address)).to.deep.equal([parseEther("750"), parseEther("100000000000000000000000").mul(75), parseEther("7500000")]);
         });
 
         it(`Deallocate last half user1 -> user2`, async () => {
@@ -143,7 +143,9 @@ describe("Scenario -- Check storage after allocate/deallocate", () => {
             expect(await staker.getDistributors(user2.address)).to.deep.equal([]);
             expect(await staker.getRecipients(user1.address)).to.deep.equal([deployer.address]);
             expect(await staker.allocations(user1.address, user2.address, false)).to.deep.equal([0, 0, 0]);
-            expect(await staker.totalAllocated(user1.address, false)).to.deep.equal([parseEther("500"), parseEther("10000000000000000000000000").div(2), parseEther("5000000")]);
+            let totalAllocated = await staker.getTotalAllocated(user1.address);
+            expect(totalAllocated.maticAmount).to.equal(parseEther("500"));
+            expect(totalAllocated.sharePriceNum.div(totalAllocated.sharePriceDenom)).to.equal(parseEther("1"));
         });
 
         it(`Deallocate deployer`, async () => {
@@ -152,7 +154,7 @@ describe("Scenario -- Check storage after allocate/deallocate", () => {
           expect(await staker.getDistributors(user2.address)).to.deep.equal([]);
           expect(await staker.getRecipients(user1.address)).to.deep.equal([]);
           expect(await staker.allocations(user1.address, user2.address, false)).to.deep.equal([0, 0, 0]);
-          expect(await staker.totalAllocated(user1.address, false)).to.deep.equal([0, 0, 0]);
+          expect(await staker.getTotalAllocated(user1.address)).to.deep.equal([0, 0, 0]);
         });
 
         it(`Allocate user1 -> deployer again`, async () => {
@@ -162,7 +164,7 @@ describe("Scenario -- Check storage after allocate/deallocate", () => {
             expect(await staker.getDistributors(deployer.address)).to.deep.equal([user1.address]);
             expect(await staker.getRecipients(user1.address)).to.deep.equal([deployer.address]);
             expect(await staker.allocations(user1.address, deployer.address, false)).to.deep.equal([parseEther("250"), sharePrice[0], sharePrice[1]]);
-            expect(await staker.totalAllocated(user1.address, false)).to.deep.equal([parseEther("250"), sharePrice[0], sharePrice[1]]);
+            expect(await staker.getTotalAllocated(user1.address)).to.deep.equal([parseEther("250"), sharePrice[0], sharePrice[1]]);
         });
     });
 });

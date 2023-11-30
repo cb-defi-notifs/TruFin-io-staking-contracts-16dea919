@@ -38,8 +38,8 @@ abstract contract TruStakeMATICv2Storage {
     /// @dev Maps nonce of validator unbonding to a Withdrawal (user & amount).
     mapping(uint256 => Withdrawal) public unbondingWithdrawals;
 
-    /// @notice Allocated balance mapping to ensure users can only withdraw funds not still allocated to a user.
-    mapping(address => mapping(bool => Allocation)) public totalAllocated;
+    /// @notice Deprecated but here for storage considerations.
+    mapping(address => mapping(bool => Allocation)) public deprecated2;
 
     /// @notice Mapping of distributor to recipient to amount and share price.
     mapping(address => mapping(address => mapping(bool => Allocation))) public allocations;
@@ -54,7 +54,7 @@ abstract contract TruStakeMATICv2Storage {
     uint256 public epsilon;
 
     /// @notice Deprecated but here for storage considerations.
-    bool public deprecated2;
+    bool public deprecated3;
 
     /// @notice Cap on the smallest amount one can deposit to the staker.
     uint256 public minDeposit;

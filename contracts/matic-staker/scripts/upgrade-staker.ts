@@ -1,23 +1,32 @@
 import { ethers, network, upgrades } from "hardhat";
+const clc = require("cli-color");
 
+const contractName = "TruStakeMATICv2";
+
+// This script will deploy the contract implementation and update the proxy.
 async function main() {
-    const stakerFactory = await ethers.getContractFactory("TruStakeMATICv2");
-    let staker;
-    if(network.name === "mainnet"){
-      staker = await upgrades.upgradeProxy(process.env.STAKER_MAINNET, stakerFactory);
-    }
-    if(network.name === "goerli"){
-      staker = await upgrades.upgradeProxy(process.env.STAKER_GOERLI, stakerFactory);
-    }
 
-    console.log("Staker deployment upgraded");
-    console.log("Delete `cache` and `artifacts` before attempting to verify");
-    console.log(`Re-verify with: npx hardhat verify ${staker.address} --network ${network.name}`);
+  let contractAddress: string;
+
+  if ((process.env.CONTRACT !== undefined)) {
+    contractAddress = process.env.CONTRACT;
+  } else throw Error("The address of the contract to upgrade should be specified by passing a CONTRACT variable.");
+
+  // Load the contract proxy and await deployment.
+  const contractFactory = await ethers.getContractFactory(contractName);
+  let contract = await upgrades.upgradeProxy(contractAddress, contractFactory, {unsafeAllowRenames: true});
+  await contract.deployed();
+
+  // Log the deployed address and verification instructions.
+  console.log(`${contractName} deployed at ${contract.address}`);
+  console.log(`Verify with:`);
+  console.log(clc.blackBright(`npx hardhat verify ${contract.address} --network ${network.name}`));
 }
 
 // We recommend this pattern to be able to use async/await everywhere
 // and properly handle errors.
 main().catch((error) => {
-    console.error(error);
-    process.exitCode = 1;
+  console.error(error);
+  process.exitCode = 1;
 });
+

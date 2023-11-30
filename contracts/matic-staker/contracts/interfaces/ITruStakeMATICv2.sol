@@ -95,35 +95,19 @@ interface ITruStakeMATICv2 {
     /// @param _individualAmount Total amount allocated to recipient by this distributor.
     /// @param _individualNum Average share price numerator at which allocations occurred.
     /// @param _individualDenom Average share price denominator at which allocations occurred.
-    /// @param _totalAmount Total amount distributor has allocated.
-    /// @param _totalNum Average share price numerator at which distributor allocated.
-    /// @param _totalDenom Average share price denominator at which distributor allocated.
     event Allocated(
         address indexed _distributor,
         address indexed _recipient,
         uint256 _individualAmount,
         uint256 _individualNum,
-        uint256 _individualDenom,
-        uint256 _totalAmount,
-        uint256 _totalNum,
-        uint256 _totalDenom
+        uint256 _individualDenom
     );
 
     /// @notice Emitted on deallocations.
     /// @param _distributor Address of user who has allocated to someone else.
     /// @param _recipient Address of user to whom something was allocated.
     /// @param _individualAmount Remaining amount allocated to recipient.
-    /// @param _totalAmount Total amount distributor has allocated.
-    /// @param _totalNum Average share price numerator at which distributor allocated.
-    /// @param _totalDenom Average share price denominator at which distributor allocated.
-    event Deallocated(
-        address indexed _distributor,
-        address indexed _recipient,
-        uint256 _individualAmount,
-        uint256 _totalAmount,
-        uint256 _totalNum,
-        uint256 _totalDenom
-    );
+    event Deallocated(address indexed _distributor, address indexed _recipient, uint256 _individualAmount);
 
     /// @notice Emitted when rewards are distributed.
     /// @param _distributor Address of user who has allocated to someone else.
@@ -132,24 +116,18 @@ interface ITruStakeMATICv2 {
     /// @param _shares Amount of shares being distributed.
     /// @param _individualNum Average share price numerator at which distributor allocated.
     /// @param _individualDenom Average share price numerator at which distributor allocated.
-    /// @param _totalNum Average share price numerator at which distributor allocated.
-    /// @param _totalDenom Average share price denominator at which distributor allocated.
     event DistributedRewards(
         address indexed _distributor,
         address indexed _recipient,
         uint256 _amount,
         uint256 _shares,
         uint256 _individualNum,
-        uint256 _individualDenom,
-        uint256 _totalNum,
-        uint256 _totalDenom
+        uint256 _individualDenom
     );
 
     /// @notice Emitted when rewards are distributed.
     /// @param _distributor Address of user who has allocated to someone else.
-    /// @param _curNum Current share price numerator.
-    /// @param _curDenom Current share price denominator.
-    event DistributedAll(address indexed _distributor, uint256 _curNum, uint256 _curDenom);
+    event DistributedAll(address indexed _distributor);
 
     // Setter Tracking
 
