@@ -79,17 +79,16 @@ describe("DISTRIBUTION", () => {
           expect(await staker.balanceOf(recipientTwo.address)).to.be.gt(0);
         });
 
-        it("Updates distributor's total allocation price to current global price", async () => {
+        it("getTotalAllocated returns current global price after distribution", async () => {
           // Save share price at distribution time
           const [globalSharePriceNumerator, globalSharePriceDenominator] = await staker.sharePrice();
 
           await staker.connect(allocatorOne).distributeAll(false);
 
-          const { sharePriceNum, sharePriceDenom } = await staker.totalAllocated(allocatorOne.address, false);
+          const { sharePriceNum, sharePriceDenom } = await staker.getTotalAllocated(allocatorOne.address);
 
           // Check total allocation share price
-          expect(sharePriceNum).to.equal(globalSharePriceNumerator);
-          expect(sharePriceDenom).to.equal(globalSharePriceDenominator);
+          expect(sharePriceNum.div(sharePriceDenom)).to.equal(globalSharePriceNumerator.div(globalSharePriceDenominator));
         });
       });
     });
@@ -153,9 +152,7 @@ describe("DISTRIBUTION", () => {
             recipientOneMATICRewards,
             recipientOneTruMATICRewards,
             globalSharePriceNumerator,
-            globalSharePriceDenominator,
-            0,
-            0
+            globalSharePriceDenominator
           );
       });
 
@@ -223,7 +220,7 @@ describe("DISTRIBUTION", () => {
           maticAmount: totalAllocationMaticAmount,
           sharePriceNum: totalAllocationSharePriceNumerator,
           sharePriceDenom: totalAllocationSharePriceDenominator
-        } = await staker.totalAllocated(allocatorOne.address, false);
+        } = await staker.getTotalAllocated(allocatorOne.address);
 
         const {
           maticAmount: individualAllocationMaticAmount,
@@ -248,23 +245,21 @@ describe("DISTRIBUTION", () => {
           .div(individualAllocationSharePriceNumerator);
 
         const intendedSharePriceDenominator = one.add(two).sub(three);
+        const sharePriceCalculated = totalAllocationSharePriceNumerator.div(intendedSharePriceDenominator);
 
         // Distribute recipientOne's rewards
         await staker.connect(allocatorOne).distributeRewards(recipientOne.address, false);
 
         // Get updated total allocation share price
-        const { sharePriceDenom } = await staker.totalAllocated(allocatorOne.address, false);
+        const { sharePriceNum, sharePriceDenom } = await staker.getTotalAllocated(allocatorOne.address);
+        const sharePriceTotalAllocated = sharePriceNum.div(sharePriceDenom);
 
         // Check total allocation share price has been updated via vault's share maths
-        expect(sharePriceDenom).to.equal(intendedSharePriceDenominator);
+        expect(sharePriceCalculated).to.equal(sharePriceTotalAllocated);
       });
 
       it("Emits 'DistributedRewards' event with correct parameters", async () => {
         await submitCheckpoint(1);
-        const {
-          sharePriceNum: totalAllocationSharePriceNumerator,
-          sharePriceDenom: totalAllocationSharePriceDenominator
-        } = await staker.totalAllocated(allocatorOne.address, false);
 
         await expect(distributeRewardsTransaction)
           .to.emit(staker, "DistributedRewards")
@@ -275,8 +270,6 @@ describe("DISTRIBUTION", () => {
             recipientOneTruMATICRewards,
             globalSharePriceNumerator,
             globalSharePriceDenominator,
-            totalAllocationSharePriceNumerator,
-            totalAllocationSharePriceDenominator
           );
       });
     });

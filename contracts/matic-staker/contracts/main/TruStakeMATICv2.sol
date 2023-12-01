@@ -324,57 +324,7 @@ contract TruStakeMATICv2 is
             );
         }
 
-        // set or update total allocation values for the distributor
-        uint256 totalAmount;
-        uint256 totalNum;
-        uint256 totalDenom;
-        {
-            Allocation storage totalAllocation = totalAllocated[msg.sender][false];
-            uint256 totalAllocationMaticAmount = totalAllocation.maticAmount;
-
-            if (totalAllocationMaticAmount == 0) {
-                // for new distributors, set total allocated amount + share price
-
-                totalAmount = _amount;
-                totalNum = globalPriceNum;
-                totalDenom = globalPriceDenom;
-            } else {
-                // for existing distributors, update total allocated amount + share price
-
-                totalAmount = totalAllocationMaticAmount + _amount;
-
-                totalNum = totalAllocationMaticAmount * 1e22 + _amount * 1e22;
-
-                totalDenom =
-                    MathUpgradeable.mulDiv(
-                        totalAllocationMaticAmount * 1e22,
-                        totalAllocation.sharePriceDenom,
-                        totalAllocation.sharePriceNum,
-                        MathUpgradeable.Rounding.Up
-                    ) +
-                    MathUpgradeable.mulDiv(
-                        _amount * 1e22,
-                        globalPriceDenom,
-                        globalPriceNum,
-                        MathUpgradeable.Rounding.Up
-                    );
-
-                // rounding total allocated share price denominator UP, in order to minimise the total allocation share price
-                // which maximises the amount owed by the distributor
-            }
-            totalAllocated[msg.sender][false] = Allocation(totalAmount, totalNum, totalDenom);
-        }
-
-        emit Allocated(
-            msg.sender,
-            _recipient,
-            individualAmount,
-            individualPriceNum,
-            individualPriceDenom,
-            totalAmount,
-            totalNum,
-            totalDenom
-        );
+        emit Allocated(msg.sender, _recipient, individualAmount, individualPriceNum, individualPriceDenom);
     }
 
     /// @notice Deallocates an amount of MATIC previously allocated to a user.
@@ -383,8 +333,6 @@ contract TruStakeMATICv2 is
     function deallocate(uint256 _amount, address _recipient) external onlyWhitelist nonReentrant {
         Allocation storage individualAllocation = allocations[msg.sender][_recipient][false];
 
-        uint256 individualSharePriceNum = individualAllocation.sharePriceNum;
-        uint256 individualSharePriceDenom = individualAllocation.sharePriceDenom;
         uint256 individualMaticAmount = individualAllocation.maticAmount;
 
         if (individualMaticAmount == 0) revert AllocationNonExistent();
@@ -412,71 +360,26 @@ contract TruStakeMATICv2 is
             individualAllocation.maticAmount = individualMaticAmount;
         }
 
-        // update total allocation values - rebalance
-        uint256 totalAmount;
-        uint256 totalPriceNum;
-        uint256 totalPriceDenom;
-
-        Allocation storage totalAllocation = totalAllocated[msg.sender][false];
-
-        uint256 totalAllocationMaticAmount = totalAllocation.maticAmount;
-        totalAmount = totalAllocationMaticAmount - _amount;
-
-        if (totalAmount == 0) {
-            delete totalAllocated[msg.sender][false];
-        } else {
-            totalPriceNum = totalAllocationMaticAmount * 1e22 - _amount * 1e22;
-
-            totalPriceDenom =
-                MathUpgradeable.mulDiv(
-                    totalAllocationMaticAmount * 1e22,
-                    totalAllocation.sharePriceDenom,
-                    totalAllocation.sharePriceNum,
-                    MathUpgradeable.Rounding.Up
-                ) -
-                MathUpgradeable.mulDiv(
-                    _amount * 1e22,
-                    individualSharePriceDenom,
-                    individualSharePriceNum,
-                    MathUpgradeable.Rounding.Down
-                );
-
-            // rounding total allocated share price denominator UP, in order to minimise the total allocation share price
-            // which maximises the amount owed by the distributor, which they cannot withdraw/transfer (strict allocations)
-            totalAllocated[msg.sender][false] = Allocation(totalAmount, totalPriceNum, totalPriceDenom);
-        }
-
-        emit Deallocated(msg.sender, _recipient, individualMaticAmount, totalAmount, totalPriceNum, totalPriceDenom);
+        emit Deallocated(msg.sender, _recipient, individualMaticAmount);
     }
 
     /// @notice Distributes the rewards from the caller's allocations to all their recipients.
     /// @param _inMatic A value indicating whether the reward is in MATIC or not.
+    /// @dev If _inMatic is set to true, the MATIC will be transferred straight from the distributor's wallet.
+    /// Their TruMATIC balance will not be altered.
     function distributeAll(bool _inMatic) external nonReentrant {
         address[] storage rec = recipients[msg.sender][false];
-        uint256 len = rec.length;
-
+        uint256 recipientsCount = rec.length;
         (uint256 globalPriceNum, uint256 globalPriceDenom) = sharePrice();
 
-        for (uint256 i; i < len; ) {
-            Allocation storage individualAllocation = allocations[msg.sender][rec[i]][false];
-
-            if (
-                individualAllocation.sharePriceNum / individualAllocation.sharePriceDenom <
-                globalPriceNum / globalPriceDenom
-            ) {
-                _distributeRewards(rec[i], msg.sender, false, _inMatic);
-            }
+        for (uint256 i; i < recipientsCount; ) {
+            _distributeRewards(rec[i], msg.sender, _inMatic, globalPriceNum, globalPriceDenom);
             unchecked {
                 ++i;
             }
         }
 
-        // update distributor's total allocation to current share price
-        Allocation storage totalAllocation = totalAllocated[msg.sender][false];
-        totalAllocation.sharePriceNum = globalPriceNum;
-        totalAllocation.sharePriceDenom = globalPriceDenom;
-
-        emit DistributedAll(msg.sender, globalPriceNum, globalPriceDenom);
+        emit DistributedAll(msg.sender);
     }
 
     /// *** EXTERNAL VIEW METHODS ***
@@ -562,8 +465,11 @@ contract TruStakeMATICv2 is
     /// @notice Distributes allocation rewards from the caller to a recipient.
     /// @param _recipient Address of allocation's recipient.
     /// @param _inMatic A value indicating whether the reward is in MATIC or not.
+    /// @dev If _inMatic is set to true, the MATIC will be transferred straight from the distributor's wallet.
+    /// Their TruMATIC balance will not be altered.
     function distributeRewards(address _recipient, bool _inMatic) public nonReentrant {
-        _distributeRewardsUpdateTotal(_recipient, msg.sender, _inMatic);
+        (uint256 globalPriceNum, uint256 globalPriceDenom) = sharePrice();
+        _distributeRewards(_recipient, msg.sender, _inMatic, globalPriceNum, globalPriceDenom);
     }
 
     /// *** PUBLIC VIEW METHODS ***
@@ -674,6 +580,49 @@ contract TruStakeMATICv2 is
     /// @return Current Polygon epoch.
     function getCurrentEpoch() public view returns (uint256) {
         return IStakeManager(stakeManagerContractAddress).epoch();
+    }
+
+    /// @notice Calculates the total amount of MATIC allocated by a distributor and the
+    /// average share price fraction at which it was allocated.
+    /// @param distributor The distributor.
+    /// @return An allocation struct representing the distributor's total allocations.
+    function getTotalAllocated(address distributor) public view returns (Allocation memory) {
+        uint256 recipientsCount = recipients[distributor][false].length; // fetch all recipients
+        uint256 totalAllocatedAmount;
+        uint256 sharePriceNum;
+        uint256 sharePriceDenom;
+
+        for (uint256 i; i < recipientsCount; i++) {
+            // loop through all recipient allocations
+            address recipient = recipients[distributor][false][i];
+            Allocation memory allocation = allocations[distributor][recipient][false];
+
+            // if this is the first iteration of the for loop
+            if (totalAllocatedAmount == 0) {
+                totalAllocatedAmount = allocation.maticAmount;
+                sharePriceNum = allocation.sharePriceNum;
+                sharePriceDenom = allocation.sharePriceDenom;
+                continue;
+            }
+
+            sharePriceDenom =
+                MathUpgradeable.mulDiv(
+                    totalAllocatedAmount * 1e22,
+                    sharePriceDenom,
+                    sharePriceNum,
+                    MathUpgradeable.Rounding.Up
+                ) +
+                MathUpgradeable.mulDiv(
+                    allocation.maticAmount * 1e22,
+                    allocation.sharePriceDenom,
+                    allocation.sharePriceNum,
+                    MathUpgradeable.Rounding.Up
+                );
+
+            sharePriceNum = totalAllocatedAmount * 1e22 + allocation.maticAmount * 1e22;
+            totalAllocatedAmount += allocation.maticAmount;
+        }
+        return Allocation(totalAllocatedAmount, sharePriceNum, sharePriceDenom);
     }
 
     /// @notice Gets the maximum amount of MATIC a user can withdraw from the vault.
@@ -885,96 +834,24 @@ contract TruStakeMATICv2 is
         }
     }
 
-    /// @notice Private function called upon distribute rewards calls.
-    /// @dev Also updates share price accordingly.
-    /// @param _recipient The receiver of the distributed rewards.
-    /// @param _distributor The person sending the rewards.
-    /// @param _inMatic A value indicating whether the rewards are in MATIC.
-    function _distributeRewardsUpdateTotal(address _recipient, address _distributor, bool _inMatic) private {
+    /// @notice Distributes the rewards related to the allocation made to that receiver.
+    /// @param _recipient Receives the rewards.
+    /// @param _distributor Distributes their rewards.
+    /// @param _inMatic A value indicating whether rewards are in MATIC.
+    function _distributeRewards(address _recipient, address _distributor, bool _inMatic, uint256 globalPriceNum, uint256 globalPriceDenom) private {
         Allocation storage individualAllocation = allocations[_distributor][_recipient][false];
+        uint256 amt = individualAllocation.maticAmount;
 
-        if (individualAllocation.maticAmount == 0) revert NothingToDistribute();
+        // if there is no allocation, revert. This should never happen during a distributeAll call.
+        if (amt == 0) revert NothingToDistribute();
 
-        Allocation storage totalAllocation = totalAllocated[_distributor][false];
-        // moved up for stack too deep issues
-        (uint256 globalPriceNum, uint256 globalPriceDenom) = sharePrice();
-
-        uint256 amountDistributed;
-        uint256 sharesDistributed;
-        // check necessary to avoid div by zero error
+        // check if there are any rewards to distribute. If not, return.
         if (
             individualAllocation.sharePriceNum / individualAllocation.sharePriceDenom ==
             globalPriceNum / globalPriceDenom
         ) {
             return;
         }
-
-        uint256 oldIndividualSharePriceNum;
-        uint256 oldIndividualSharePriceDenom;
-        // distribute rewards private fn, which does not update total allocated
-        (oldIndividualSharePriceNum, oldIndividualSharePriceDenom, sharesDistributed) = _distributeRewards(
-            _recipient,
-            _distributor,
-            true,
-            _inMatic
-        );
-
-        amountDistributed = convertToAssets(sharesDistributed);
-        // note: this amount was rounded, but it's only being used as a parameter in the emitted event,
-        // should be cautious when using rounded values in calculations
-
-        uint256 individualAllocationMaticAmount = individualAllocation.maticAmount;
-        uint256 totalAllocationSharePriceNum = totalAllocation.sharePriceNum;
-
-        // update total allocated
-        uint256 newTotalAllocationSharePriceDenom = totalAllocation.sharePriceDenom +
-            MathUpgradeable.mulDiv(
-                individualAllocationMaticAmount * 1e22,
-                globalPriceDenom * totalAllocationSharePriceNum,
-                totalAllocation.maticAmount * globalPriceNum,
-                MathUpgradeable.Rounding.Up
-            ) /
-            1e22 -
-            MathUpgradeable.mulDiv(
-                individualAllocationMaticAmount * 1e22,
-                oldIndividualSharePriceDenom * totalAllocationSharePriceNum,
-                totalAllocation.maticAmount * oldIndividualSharePriceNum,
-                MathUpgradeable.Rounding.Down
-            ) /
-            1e22;
-
-        // totalAllocation.sharePriceNum unchanged
-        totalAllocation.sharePriceDenom = newTotalAllocationSharePriceDenom;
-        // rounding total allocated share price denominator UP, in order to minimise the total allocation share price
-        // which maximises the amount owed by the distributor
-
-        emit DistributedRewards(
-            _distributor,
-            _recipient,
-            amountDistributed,
-            sharesDistributed,
-            globalPriceNum,
-            globalPriceDenom,
-            totalAllocationSharePriceNum,
-            newTotalAllocationSharePriceDenom
-        );
-    }
-
-    /// @notice Distributes the rewards related to the allocation made to that receiver.
-    /// @param _recipient Receives the rewards.
-    /// @param _distributor Distributes their rewards.
-    /// @param _individual A value indicating whether this function is called within distributeRewards(true) or distributeAll(false).
-    /// @param _inMatic A value indicating whether rewards are in MATIC.
-    function _distributeRewards(
-        address _recipient,
-        address _distributor,
-        bool _individual,
-        bool _inMatic
-    ) private returns (uint256, uint256, uint256) {
-        Allocation storage individualAllocation = allocations[_distributor][_recipient][false];
-        uint256 amt = individualAllocation.maticAmount;
-
-        (uint256 globalPriceNum, uint256 globalPriceDenom) = sharePrice();
 
         // calculate amount of TruMatic to move from distributor to recipient
         uint256 sharesToMove;
@@ -1004,23 +881,17 @@ contract TruStakeMATICv2 is
             _transfer(_distributor, _recipient, sharesToMove);
         }
 
-        (uint256 oldNum, uint256 oldDenom) = (individualAllocation.sharePriceNum, individualAllocation.sharePriceDenom);
         individualAllocation.sharePriceNum = globalPriceNum;
         individualAllocation.sharePriceDenom = globalPriceDenom;
 
-        if (!_individual) {
-            emit DistributedRewards(
-                _distributor,
-                _recipient,
-                convertToAssets(sharesToMove),
-                sharesToMove,
-                globalPriceNum,
-                globalPriceDenom,
-                0,
-                0
-            );
-        }
-        return (oldNum, oldDenom, sharesToMove);
+        emit DistributedRewards(
+            _distributor,
+            _recipient,
+            convertToAssets(sharesToMove),
+            sharesToMove,
+            globalPriceNum,
+            globalPriceDenom
+        );
     }
 
     /// @notice Removes an address from an array of addresses.

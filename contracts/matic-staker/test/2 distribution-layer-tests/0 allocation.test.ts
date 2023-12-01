@@ -69,7 +69,7 @@ describe("ALLOCATION", () => {
 
       // Check values are correctly saved into total allocated struct, no math required as first allocation
 
-      const oneTotalAllocated = await staker.totalAllocated(one.address, strictness);
+      const oneTotalAllocated = await staker.getTotalAllocated(one.address);
 
       expect(oneTotalAllocated.maticAmount).to.equal(parseEther(1000));
       expect(oneTotalAllocated.sharePriceNum).to.equal(sharePriceFraction[0]);
@@ -111,7 +111,7 @@ describe("ALLOCATION", () => {
       expect(oneTwoAllocation.sharePriceNum).to.equal(sharePriceFractionOld[0]);
       expect(oneTwoAllocation.sharePriceDenom).to.equal(sharePriceFractionOld[1]);
 
-      const oneTotalAllocated = await staker.totalAllocated(one.address, strictness);
+      const oneTotalAllocated = await staker.getTotalAllocated(one.address);
       expect(oneTotalAllocated.maticAmount).to.equal(firstAllocationAmount);
       expect(oneTotalAllocated.sharePriceNum).to.equal(sharePriceFractionOld[0]);
       expect(oneTotalAllocated.sharePriceDenom).to.equal(sharePriceFractionOld[1]);
@@ -132,7 +132,7 @@ describe("ALLOCATION", () => {
           firstAllocationAmount.add(secondAllocationAmount)
         );
 
-        let oneTotalAllocatedNew = await staker.totalAllocated(one.address, strictness);
+        let oneTotalAllocatedNew = await staker.getTotalAllocated(one.address);
         expect(oneTotalAllocatedNew.maticAmount).to.equal(
           firstAllocationAmount.add(secondAllocationAmount)
         );
@@ -184,7 +184,7 @@ describe("ALLOCATION", () => {
       await staker.connect(one).allocate(oneThreeAllocatedAmount, three.address);
 
       // Check one total allocated values are stored correctly
-      const oneTotalAllocated = await staker.totalAllocated(one.address, strictness);
+      const oneTotalAllocated = await staker.getTotalAllocated(one.address);
       expect(oneTotalAllocated.maticAmount).to.equal(amountAllocatedWithOldSharePrice);
       expect(
         oneTotalAllocated.sharePriceNum.div(oneTotalAllocated.sharePriceDenom)
@@ -265,7 +265,7 @@ describe("ALLOCATION", () => {
 
       // Get actual values
 
-      const oneTotalAllocatedNew = await staker.totalAllocated(one.address, strictness);
+      const oneTotalAllocatedNew = await staker.getTotalAllocated(one.address);
 
       const oneTotalAllocationSharePrice = oneTotalAllocatedNew.sharePriceNum
         .div(oneTotalAllocatedNew.sharePriceDenom);
@@ -294,7 +294,7 @@ describe("ALLOCATION", () => {
       const oneTwoAllocation = await staker.allocations(one.address, two.address, strictness);
       const oneThreeAllocation = await staker.allocations(one.address, three.address, strictness);
       const oneFourAllocation = await staker.allocations(one.address, four.address, strictness);
-      const totalAllocated = await staker.totalAllocated(one.address,strictness);
+      const totalAllocated = await staker.getTotalAllocated(one.address);
 
       expect(oneTwoAllocation.sharePriceNum.div(oneTwoAllocation.sharePriceDenom)).to.be.greaterThan(parseEther(1));
       expect(oneThreeAllocation.sharePriceNum.div(oneThreeAllocation.sharePriceDenom)).to.be.greaterThan(oneTwoAllocation.sharePriceNum.div(oneTwoAllocation.sharePriceDenom));
@@ -302,7 +302,6 @@ describe("ALLOCATION", () => {
       expect(oneFourAllocation.sharePriceNum.div(oneFourAllocation.sharePriceDenom)).to.be.lessThan(sharePrice[0].div(sharePrice[1]));
       expect(totalAllocated.sharePriceNum.div(totalAllocated.sharePriceDenom)).to.be.lessThan(sharePrice[0].div(sharePrice[1]));
       expect(totalAllocated.sharePriceNum.div(totalAllocated.sharePriceDenom)).to.be.greaterThan(parseEther(1));
-
 
     });
 
@@ -405,8 +404,7 @@ describe("ALLOCATION", () => {
       await staker.connect(one).allocate(parseEther(20), two.address);
 
       const oneTwoAllocation =await staker.allocations(one.address, two.address, strictness);
-      const totalAllocated = await staker.totalAllocated(one.address, strictness);
-      const allocatedPrice = (totalAllocated.sharePriceNum).div(totalAllocated.sharePriceDenom);
+      const allocatedPrice = (oneTwoAllocation.sharePriceNum).div(oneTwoAllocation.sharePriceDenom);
 
       for (let i = 0; i<5; i++){
       // REWARDS ACCRUE
@@ -417,14 +415,12 @@ describe("ALLOCATION", () => {
       expect(distributeTx).to.emit(staker, "DistributedRewards");
 
       const oneTwoAllocationNow = await staker.allocations(one.address, two.address, strictness);
-      const totalAllocatedNow = await staker.totalAllocated(one.address, strictness);
 
       // Absolute distributor MATIC balances remain unchanged
       expect(oneTwoAllocationNow.maticAmount).to.equal(oneTwoAllocation.maticAmount);
-      expect(totalAllocatedNow.maticAmount).to.equal(totalAllocated.maticAmount);
 
       // Current allocation price
-      const allocatedPriceNow = (totalAllocatedNow.sharePriceNum).div(totalAllocatedNow.sharePriceDenom);
+      const allocatedPriceNow = (oneTwoAllocationNow.sharePriceNum).div(oneTwoAllocationNow.sharePriceDenom);
 
       // current share price
       const currentPrice = await staker.sharePrice();
@@ -445,8 +441,7 @@ describe("ALLOCATION", () => {
       await submitCheckpoint(i);
 
       const oneTwoAllocationOne =await staker.allocations(one.address, two.address, strictness);
-      const totalAllocatedOne = await staker.totalAllocated(one.address, strictness);
-      const allocatedPriceOne = (totalAllocatedOne.sharePriceNum).div(totalAllocatedOne.sharePriceDenom);
+      const allocatedPriceOne = (oneTwoAllocationOne.sharePriceNum).div(oneTwoAllocationOne.sharePriceDenom);
 
       // SHARE PRICE BEFORE ALLOCATION #2
       const price = await staker.sharePrice();
@@ -457,8 +452,7 @@ describe("ALLOCATION", () => {
 
       // NEW ALLOCATION DETAILS (W/ NEW SHARE PRICE)
       const oneTwoAllocationTwo = await staker.allocations(one.address, two.address, strictness);
-      const totalAllocatedTwo = await staker.totalAllocated(one.address, strictness);
-      const allocatedPriceTwo = (totalAllocatedTwo.sharePriceNum).div(totalAllocatedTwo.sharePriceDenom);
+      const allocatedPriceTwo = (oneTwoAllocationTwo.sharePriceNum).div(oneTwoAllocationTwo.sharePriceDenom);
 
       // ESTIMATE NEW SHARE PRICE
       const priceIncrease = (sharePrice).sub(allocatedPriceOne);
@@ -469,7 +463,6 @@ describe("ALLOCATION", () => {
       expect(allocatedPriceTwo).to.be.lessThanOrEqual(halfOfTwoSharePrices);
       expect(allocatedPriceTwo).to.be.greaterThan(allocatedPriceOne);
       expect(oneTwoAllocationTwo.maticAmount).to.be.greaterThan(oneTwoAllocationOne.maticAmount);
-      expect(totalAllocatedTwo.maticAmount).to.be.greaterThan(totalAllocatedOne.maticAmount);
       };
     });
 

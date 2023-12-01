@@ -45,10 +45,7 @@ describe("DEALLOCATE", () => {
         .withArgs(
           allocatorOne.address,
           recipientOne.address,
-          expectedIndividualAmount,
-          expectedTotalAmount,
-          expectedTotalPriceNum,
-          expectedTotalPriceDenom
+          expectedIndividualAmount
         );
     });
 
@@ -163,10 +160,10 @@ describe("DEALLOCATE", () => {
     });
 
     describe("Total Allocation State", async () => {
-      it("Deletes total allocation from storage if complete total deallocation", async () => {
+      it("Returns zero for total deallocation", async () => {
         await staker.connect(allocatorOne).deallocate(ALLOCATED_AMOUNT, recipientOne.address);
 
-        const totalAllocation = await staker.totalAllocated(allocatorOne.address, strictness);
+        const totalAllocation = await staker.getTotalAllocated(allocatorOne.address);
 
         // Check if state deleted
         expect(totalAllocation.maticAmount).to.equal(0);
@@ -174,44 +171,12 @@ describe("DEALLOCATE", () => {
         expect(totalAllocation.sharePriceDenom).to.equal(0);
       });
 
-      it("Updates total allocation price if partial total deallocation", async () => {
-        const {
-          sharePriceNum: preDeallocationSharePriceNumerator,
-          sharePriceDenom: preDeallocationSharePriceDenominator
-        } = await staker.totalAllocated(allocatorOne.address, strictness);
+      it("Decreases total allocation amount if partial deallocation", async () => {
+        const { maticAmount: preDeallocationTotalAllocationAmount } = await staker.getTotalAllocated(allocatorOne.address);
 
         await staker.connect(allocatorOne).deallocate(DEALLOCATED_AMOUNT, recipientOne.address);
 
-        const {
-          sharePriceNum: postDeallocationSharePriceNumerator,
-          sharePriceDenom: postDeallocationSharePriceDenominator
-        } = await staker.totalAllocated(allocatorOne.address, strictness);
-
-        // Check price numerator and denominator are decreased
-        expect(postDeallocationSharePriceNumerator).to.be.lessThan(preDeallocationSharePriceNumerator);
-        expect(postDeallocationSharePriceDenominator).to.be.lessThan(preDeallocationSharePriceDenominator);
-
-        // Calculate expected total allocation price
-        const expectedTotalAllocationPriceNumerator = ALLOCATED_AMOUNT.sub(DEALLOCATED_AMOUNT).mul(parseEther(10000));
-        const expectedTotalAllocationPriceDenominator = ALLOCATED_AMOUNT.sub(DEALLOCATED_AMOUNT).mul(10000);
-
-        // Check if updated to expected value
-        expect(postDeallocationSharePriceNumerator).to.equal(expectedTotalAllocationPriceNumerator);
-        expect(postDeallocationSharePriceDenominator).to.equal(expectedTotalAllocationPriceDenominator);
-      });
-
-      it("Decreases total allocation amount if partial total deallocation", async () => {
-        const { maticAmount: preDeallocationTotalAllocationAmount } = await staker.totalAllocated(
-          allocatorOne.address,
-          strictness
-        );
-
-        await staker.connect(allocatorOne).deallocate(DEALLOCATED_AMOUNT, recipientOne.address);
-
-        const { maticAmount: postDeallocationTotalAllocationAmount } = await staker.totalAllocated(
-          allocatorOne.address,
-          strictness
-        );
+        const { maticAmount: postDeallocationTotalAllocationAmount } = await staker.getTotalAllocated(allocatorOne.address);
 
         // Check allocation reduced
         expect(postDeallocationTotalAllocationAmount).to.be.lessThan(preDeallocationTotalAllocationAmount);

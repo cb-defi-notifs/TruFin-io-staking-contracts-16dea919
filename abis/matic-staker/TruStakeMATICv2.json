@@ -136,24 +136,6 @@
         "internalType": "uint256",
         "name": "_individualDenom",
         "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "_totalAmount",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "_totalNum",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "_totalDenom",
-        "type": "uint256"
       }
     ],
     "name": "Allocated",
@@ -203,24 +185,6 @@
         "indexed": false,
         "internalType": "uint256",
         "name": "_individualAmount",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "_totalAmount",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "_totalNum",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "_totalDenom",
         "type": "uint256"
       }
     ],
@@ -284,18 +248,6 @@
         "internalType": "address",
         "name": "_distributor",
         "type": "address"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "_curNum",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "_curDenom",
-        "type": "uint256"
       }
     ],
     "name": "DistributedAll",
@@ -338,18 +290,6 @@
         "indexed": false,
         "internalType": "uint256",
         "name": "_individualDenom",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "_totalNum",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "_totalDenom",
         "type": "uint256"
       }
     ],
@@ -1094,8 +1034,42 @@
     "type": "function"
   },
   {
-    "inputs": [],
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      },
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
     "name": "deprecated2",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "maticAmount",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "sharePriceNum",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "sharePriceDenom",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "deprecated3",
     "outputs": [
       {
         "internalType": "bool",
@@ -1326,6 +1300,42 @@
         "internalType": "uint256",
         "name": "",
         "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "distributor",
+        "type": "address"
+      }
+    ],
+    "name": "getTotalAllocated",
+    "outputs": [
+      {
+        "components": [
+          {
+            "internalType": "uint256",
+            "name": "maticAmount",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "sharePriceNum",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "sharePriceDenom",
+            "type": "uint256"
+          }
+        ],
+        "internalType": "struct Allocation",
+        "name": "",
+        "type": "tuple"
       }
     ],
     "stateMutability": "view",
@@ -1781,40 +1791,6 @@
         "internalType": "string",
         "name": "",
         "type": "string"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "",
-        "type": "address"
-      },
-      {
-        "internalType": "bool",
-        "name": "",
-        "type": "bool"
-      }
-    ],
-    "name": "totalAllocated",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "maticAmount",
-        "type": "uint256"
-      },
-      {
-        "internalType": "uint256",
-        "name": "sharePriceNum",
-        "type": "uint256"
-      },
-      {
-        "internalType": "uint256",
-        "name": "sharePriceDenom",
-        "type": "uint256"
       }
     ],
     "stateMutability": "view",
