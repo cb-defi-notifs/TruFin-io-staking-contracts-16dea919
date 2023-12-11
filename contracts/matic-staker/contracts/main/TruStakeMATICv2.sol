@@ -682,7 +682,7 @@ contract TruStakeMATICv2 is
 
         // calculate share increase
         uint256 shareIncreaseUser = convertToShares(_amount);
-        uint256 shareIncreaseTsy = (totalRewards() * phi * 1e18 * globalPriceDenom) / (globalPriceNum * PHI_PRECISION);
+        uint256 shareIncreaseTsy = (getRewardsFromValidator(_validator) * phi * 1e18 * globalPriceDenom) / (globalPriceNum * PHI_PRECISION);
 
         // piggyback previous withdrawn rewards in this staking call
         uint256 totalAssetBalance = totalAssets();
@@ -723,7 +723,7 @@ contract TruStakeMATICv2 is
         // calculate share decrease
         uint256 shareDecreaseUser = (_amount * globalPriceDenom * 1e18) / globalPriceNum;
 
-        uint256 shareIncreaseTsy = (totalRewards() * phi * globalPriceDenom * 1e18) / (globalPriceNum * PHI_PRECISION);
+        uint256 shareIncreaseTsy = (getRewardsFromValidator(_validator) * phi * globalPriceDenom * 1e18) / (globalPriceNum * PHI_PRECISION);
 
         // If remaining user balance is below 1 MATIC, entire balance is withdrawn and all shares
         // are burnt. We allow the user to withdraw their deposited amount + epsilon

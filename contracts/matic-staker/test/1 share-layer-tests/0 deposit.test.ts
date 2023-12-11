@@ -13,11 +13,11 @@ import { smock } from '@defi-wonderland/smock';
 describe("DEPOSIT", () => {
   // Pre-deposit checked in "INIT" describe block
 
-  let one, two, nonWhitelistedUser, staker, stakeManager, treasury, deployer, validatorShare, token;
+  let one, two, nonWhitelistedUser, staker, validatorShare2, treasury, deployer, validatorShare, token;
 
   beforeEach(async () => {
     // reset to fixture
-    ({ deployer, one, two, nonWhitelistedUser, staker, stakeManager, treasury, validatorShare, token } = await loadFixture(deployment));
+    ({ deployer, one, two, nonWhitelistedUser, staker, validatorShare2, treasury, validatorShare, token } = await loadFixture(deployment));
 
   });
 
@@ -399,6 +399,39 @@ describe("DEPOSIT", () => {
     await staker
       .connect(one)
     ["depositToSpecificValidator(uint256,address)"](parseEther(0), newValidator.address);
+  });
+
+  it("when depositing, the treasury is only minted shares for claimed rewards", async () => {
+    // deposit to two different validators
+    await staker.connect(one).deposit(parseEther(100));
+    await staker.connect(deployer).addValidator(validatorShare2.address);
+    await staker.connect(one).depositToSpecificValidator(parseEther(100), validatorShare2.address);
+
+    // accrue rewards
+    await submitCheckpoint(0);
+
+    // check balances before
+    const rewardsValidatorOne = await staker.getRewardsFromValidator(validatorShare.address);
+    const rewardsValidatorTwo = await staker.getRewardsFromValidator(validatorShare2.address);
+
+    // deposit to default validator
+    await staker.connect(two).deposit(parseEther(200));
+
+    // check balances after
+    const stakerBalanceAfter = await staker.totalAssets();
+    const treasuryBalanceAfter = await staker.balanceOf(treasury.address);
+    const [globalPriceNum, globalPriceDenom] = await staker.sharePrice();
+
+    // calculate minted shares based off claimed rewards
+    const sharesMinted = stakerBalanceAfter.mul(constants.PHI).mul(parseEther(1)).mul(globalPriceDenom).div((globalPriceNum.mul(constants.PHI_PRECISION)));
+
+    expect(stakerBalanceAfter).to.equal(rewardsValidatorOne)
+    expect(await staker.getRewardsFromValidator(validatorShare2.address)).to.equal(rewardsValidatorTwo);
+    expect(treasuryBalanceAfter).to.equal(sharesMinted);
+
+    // now, a new deposit to the same validator should not mint any more shares for the treasury
+    await staker.connect(two).deposit(parseEther(200));
+    expect(await staker.balanceOf(treasury.address)).to.equal(treasuryBalanceAfter);
   });
 });
 

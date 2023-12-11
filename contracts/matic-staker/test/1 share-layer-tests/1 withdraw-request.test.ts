@@ -10,12 +10,12 @@ import { submitCheckpoint } from "../helpers/state-interaction";
 describe("WITHDRAW REQUEST", () => {
   // Initial state, deposits, rewards compounding already tested
 
-  let treasury, deployer, one, two, nonWhitelistedUser, staker, validatorShare;
+  let treasury, deployer, one, nonWhitelistedUser, validatorShare2, staker, validatorShare;
   let TREASURY_INITIAL_DEPOSIT;
 
   beforeEach(async () => {
     // reset to fixture
-    ({ treasury, deployer, one, two, nonWhitelistedUser, staker, validatorShare } = await loadFixture(deployment));
+    ({ treasury, deployer, one, nonWhitelistedUser, validatorShare2, staker, validatorShare } = await loadFixture(deployment));
     TREASURY_INITIAL_DEPOSIT = parseEther(100)
     await staker.connect(treasury).deposit(TREASURY_INITIAL_DEPOSIT);
   });
@@ -184,6 +184,39 @@ describe("WITHDRAW REQUEST", () => {
     let [user, amount] = await staker.withdrawals(validatorShare.address, unbondNonce);
     expect(user).to.equal(one.address);
     expect(amount).to.equal(parseEther(3e6));
+  });
+
+  it("when withdrawing, the treasury is only minted shares for claimed rewards", async () => {
+    // deposit to two different validators
+    await staker.connect(one).deposit(parseEther(100));
+    await staker.connect(deployer).addValidator(validatorShare2.address);
+    await staker.connect(one).depositToSpecificValidator(parseEther(100), validatorShare2.address);
+
+    // accrue rewards
+    await submitCheckpoint(0);
+
+    // check balances before
+    const rewardsValidatorOne = await staker.getRewardsFromValidator(validatorShare.address);
+    const rewardsValidatorTwo = await staker.getRewardsFromValidator(validatorShare2.address);
+
+    // withdraw from second validator
+    await staker.connect(one).withdrawFromSpecificValidator(parseEther(50), validatorShare2.address);
+
+    // check balances after
+    const stakerBalanceAfter = await staker.totalAssets();
+    const treasuryBalanceAfter = await staker.balanceOf(treasury.address);
+    const [globalPriceNum, globalPriceDenom] = await staker.sharePrice();
+
+    // calculate minted shares based off claimed rewards
+    const sharesMinted = stakerBalanceAfter.mul(constants.PHI).mul(parseEther(1)).mul(globalPriceDenom).div((globalPriceNum.mul(constants.PHI_PRECISION)));
+
+    expect(stakerBalanceAfter).to.equal(rewardsValidatorTwo);
+    expect(await staker.getRewardsFromValidator(validatorShare.address)).to.equal(rewardsValidatorOne);
+    expect(treasuryBalanceAfter).to.equal(sharesMinted.add(TREASURY_INITIAL_DEPOSIT));
+
+    // now, a new withdraw request to the same validator should not mint any more shares to the treasury
+    await staker.connect(one).withdrawFromSpecificValidator(parseEther(50), validatorShare2.address);
+    expect(await staker.balanceOf(treasury.address)).to.equal(treasuryBalanceAfter);
   });
 
   it("try initiating a withdrawal of size zero", async () => {
