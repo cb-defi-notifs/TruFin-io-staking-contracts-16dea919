@@ -248,13 +248,13 @@ contract TruStakeMATICv2 is
 
         _restake();
 
+         // Minted shares are given to the treasury to effectively take a fee
+        _mint(treasuryAddress, shareIncrease);
+
         // if there is MATIC in the vault, stake it with the provided validator
         if (totalAssetBalance > 0) {
             _deposit(address(0), 0, _validator);
         }
-
-        // Minted shares are given to the treasury to effectively take a fee
-        _mint(treasuryAddress, shareIncrease);
 
         emit RewardsCompounded(amountRestaked, shareIncrease);
     }

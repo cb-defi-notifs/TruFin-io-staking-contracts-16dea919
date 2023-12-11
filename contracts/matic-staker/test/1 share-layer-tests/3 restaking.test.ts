@@ -15,6 +15,7 @@ import {
   setTokenBalance,
   submitCheckpoint
 } from "../helpers/state-interaction";
+import { smock } from '@defi-wonderland/smock';
 
 describe("RESTAKE", () => {
   let deployer, treasury, one, token, stakeManager, validatorShare, validatorShare2, staker;
@@ -156,6 +157,49 @@ describe("RESTAKE", () => {
       expect(await staker.totalStaked()).to.equal(
         preStakeTotalStaked.add(preStakeClaimedRewards).add(preStakeTotalRewards)
       );
+    });
+
+    it("if validator restake fails, treasury fees on deposit are computed with correct sharePrice", async () => {
+      // mock validator
+      const newValidator = await smock.fake(constants.VALIDATOR_SHARE_ABI);
+      newValidator.getLiquidRewards.returns(parseEther(1));
+
+      // add the new validator
+      await staker.addValidator(newValidator.address);
+
+      // deposit some MATIC into the default and new validator
+      let depositAmt = parseEther(5e6);
+      await staker.connect(one).deposit(depositAmt);
+      await staker.connect(one).depositToSpecificValidator(depositAmt, newValidator.address);
+
+      // set `claimedRewards` / MATIC balance to 1 MATIC
+      await setTokenBalance(token, staker.address, parseEther(1));
+
+      // accrue rewards
+      await submitCheckpoint(0);
+
+      let treasuryBalanceBefore = await staker.balanceOf(treasury.address);
+      let defaultValidatorRewards = await staker.getRewardsFromValidator(validatorShare.address);
+      let newValidatorRewards = await staker.getRewardsFromValidator(newValidator.address);
+      let preSupply = await staker.totalSupply();
+      let [globalPriceNum, globalPriceDenom] = await staker.sharePrice();
+
+      // calculate the expected shares minted for restaking
+      const sharesMintedForRestake = (defaultValidatorRewards.add(newValidatorRewards)).mul(constants.PHI).mul(parseEther(1)).mul(globalPriceDenom).div((globalPriceNum.mul(constants.PHI_PRECISION)));
+
+      // stake claimed rewards
+      await staker.connect(deployer).compoundRewards(newValidator.address);
+
+      // calculate the expected share price after restaking but before depositing claimed rewards
+      let totalStakedMidCompound = (depositAmt.mul(2).add(defaultValidatorRewards).add(newValidatorRewards))
+      globalPriceNum = totalStakedMidCompound.mul(constants.PHI_PRECISION).add((constants.PHI_PRECISION.sub(constants.PHI)).mul(newValidatorRewards)).mul(parseEther(1));
+      globalPriceDenom = (preSupply.add(sharesMintedForRestake)).mul(constants.PHI_PRECISION);
+
+      // calculate expected shares minted for depositing claimed rewards
+      const sharesMintedForDeposit = newValidatorRewards.mul(constants.PHI).mul(parseEther(1)).mul(globalPriceDenom).div((globalPriceNum.mul(constants.PHI_PRECISION)));
+
+      // ensure treasury was transferred correct amount of shares
+      expect((await staker.balanceOf(treasury.address)).sub(treasuryBalanceBefore)).to.equal(sharesMintedForDeposit.add(sharesMintedForRestake));
     });
 
     it("compoundRewards correctly updates staked amount", async () => {
