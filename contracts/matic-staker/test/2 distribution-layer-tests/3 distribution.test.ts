@@ -9,7 +9,7 @@ import { EPSILON } from "../helpers/constants";
 
 describe("DISTRIBUTION", () => {
   // Accounts
-  let deployer, treasury, allocatorOne, recipientOne, recipientTwo, depositor, staker, stakeManager, token;
+  let deployer, treasury, allocatorOne, recipientOne, recipientTwo, depositor, staker, whitelist, token;
 
   // Test constants
   const ALLOCATED_AMOUNT = parseEther(10000);
@@ -24,7 +24,7 @@ describe("DISTRIBUTION", () => {
       deployer,
       treasury,
       staker,
-      stakeManager,
+      whitelist,
       token
     } = await loadFixture(deployment));
 
@@ -89,6 +89,14 @@ describe("DISTRIBUTION", () => {
 
           // Check total allocation share price
           expect(sharePriceNum.div(sharePriceDenom)).to.equal(globalSharePriceNumerator.div(globalSharePriceDenominator));
+        });
+
+        it("DistributeAll reverts if user is not whitelisted", async () => {
+          // blacklist allocator
+          whitelist.isUserWhitelisted.returns(false);
+
+          // attempt to distribute recipient rewards should fail
+          await expect(staker.connect(allocatorOne).distributeAll(false)).to.be.revertedWithCustomError(staker, "UserNotWhitelisted");
         });
       });
     });
@@ -374,7 +382,7 @@ describe("DISTRIBUTION", () => {
       deployer,
       treasury,
       staker,
-      stakeManager
+      whitelist
     } = await loadFixture(deployment));
 
     // Perform same deposits and allocations made previously
@@ -412,6 +420,14 @@ describe("DISTRIBUTION", () => {
         await expect(
           staker.connect(allocatorOne).distributeRewards(recipientOne.address, true)
         ).to.be.revertedWith("SafeERC20: low-level call failed");
+      });
+
+      it("Reverts if user is not whitelisted", async () => {
+        // blacklist allocator
+        whitelist.isUserWhitelisted.returns(false);
+
+        // attempt to distribute recipient rewards should fail
+        await expect(staker.connect(allocatorOne).distributeRewards(recipientOne.address, false)).to.be.revertedWithCustomError(staker, "UserNotWhitelisted");
       });
 
       it("No TruMATIC is transferred to recipients when distributing MATIC", async () => {
@@ -496,4 +512,8 @@ describe("DISTRIBUTION", () => {
       });
     });
   });
+
+  afterEach(() => {
+    whitelist.isUserWhitelisted.returns(true);
+  })
 });

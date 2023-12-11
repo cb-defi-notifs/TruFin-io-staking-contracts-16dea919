@@ -367,7 +367,7 @@ contract TruStakeMATICv2 is
     /// @param _inMatic A value indicating whether the reward is in MATIC or not.
     /// @dev If _inMatic is set to true, the MATIC will be transferred straight from the distributor's wallet.
     /// Their TruMATIC balance will not be altered.
-    function distributeAll(bool _inMatic) external nonReentrant {
+    function distributeAll(bool _inMatic) external onlyWhitelist nonReentrant {
         address[] storage rec = recipients[msg.sender][false];
         uint256 recipientsCount = rec.length;
         (uint256 globalPriceNum, uint256 globalPriceDenom) = sharePrice();
@@ -467,7 +467,7 @@ contract TruStakeMATICv2 is
     /// @param _inMatic A value indicating whether the reward is in MATIC or not.
     /// @dev If _inMatic is set to true, the MATIC will be transferred straight from the distributor's wallet.
     /// Their TruMATIC balance will not be altered.
-    function distributeRewards(address _recipient, bool _inMatic) public nonReentrant {
+    function distributeRewards(address _recipient, bool _inMatic) public onlyWhitelist nonReentrant {
         (uint256 globalPriceNum, uint256 globalPriceDenom) = sharePrice();
         _distributeRewards(_recipient, msg.sender, _inMatic, globalPriceNum, globalPriceDenom);
     }
