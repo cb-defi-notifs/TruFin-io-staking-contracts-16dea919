@@ -250,9 +250,6 @@ contract TruStakeMATICv2 is
 
         // if there is MATIC in the vault, stake it with the provided validator
         if (totalAssetBalance > 0) {
-            if (validators[_validator].state != ValidatorState.ENABLED) {
-                revert ValidatorNotEnabled();
-            }
             _deposit(address(0), 0, _validator);
         }
 
