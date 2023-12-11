@@ -46,6 +46,11 @@
   },
   {
     "inputs": [],
+    "name": "NoRecipientsFound",
+    "type": "error"
+  },
+  {
+    "inputs": [],
     "name": "NothingToDistribute",
     "type": "error"
   },

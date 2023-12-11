@@ -196,6 +196,9 @@ interface ITruStakeMATICv2 {
     /// share price is the same as the current share price.
     error NothingToDistribute();
 
+     /// @notice Error thrown when no recipients are found to distribute to.
+    error NoRecipientsFound();
+
     /// @notice Error thrown when the distribution fee is higher than the fee precision.
     error DistPhiTooLarge();
 

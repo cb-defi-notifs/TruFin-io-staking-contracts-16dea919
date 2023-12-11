@@ -367,6 +367,9 @@ contract TruStakeMATICv2 is
     function distributeAll(bool _inMatic) external onlyWhitelist nonReentrant {
         address[] storage rec = recipients[msg.sender][false];
         uint256 recipientsCount = rec.length;
+
+        if (recipientsCount == 0) revert NoRecipientsFound();
+
         (uint256 globalPriceNum, uint256 globalPriceDenom) = sharePrice();
 
         for (uint256 i; i < recipientsCount; ) {

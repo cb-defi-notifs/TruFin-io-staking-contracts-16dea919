@@ -58,6 +58,11 @@ describe("DISTRIBUTION", () => {
           expect(await staker.balanceOf(recipientOne.address)).to.equal(0);
           expect(await staker.balanceOf(recipientTwo.address)).to.equal(0);
         });
+
+        it("Reverts if there are no recipients to distribute to", async () => {
+          // attempt to distribute to all recipients revert if there are no recipients.
+          await expect(staker.connect(depositor).distributeAll(false)).to.be.revertedWithCustomError(staker, "NoRecipientsFound");
+        });
       });
 
       describe("Distribute rewards", async () => {
