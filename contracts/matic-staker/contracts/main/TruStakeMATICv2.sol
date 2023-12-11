@@ -792,8 +792,8 @@ contract TruStakeMATICv2 is
     /// @param _amount Amount of MATIC to stake.
     /// @param _validator Address of the validator to stake with.
     function _stake(uint256 _amount, address _validator) private {
-        validators[_validator].stakedAmount += _amount;
-        IValidatorShare(_validator).buyVoucher(_amount, _amount);
+        uint256 amountToDeposit = IValidatorShare(_validator).buyVoucher(_amount, _amount);
+        validators[_validator].stakedAmount += amountToDeposit;
     }
 
     /// @notice Requests to unstake a certain amount of MATIC from the default validator.

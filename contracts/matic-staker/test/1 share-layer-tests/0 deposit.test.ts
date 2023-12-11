@@ -304,6 +304,7 @@ describe("DEPOSIT", () => {
   it("user can deposit to specific validator", async () => {
     // mock validator
     const newValidator = await smock.fake(constants.VALIDATOR_SHARE_ABI);
+    newValidator.buyVoucher.returns(parseEther(1));
     await staker.connect(deployer).addValidator(newValidator.address);
 
     // deposit to specific validator
