@@ -37,6 +37,18 @@ interface IMasterWhitelist {
     /// @notice Error thrown when trying to perform an action reserved for agents.
     error CallerIsNotAnAgent();
 
+    /// @notice Error thrown when trying to remove the owner as an agent.
+    error CannotRemoveOwner();
+
+    /// @notice Error thrown when trying to add the owner as an agent.
+    error CannotAddOwner();
+
+    /// @notice Error thrown when trying to remove a non-agent as an agent.
+    error UserIsNotAnAgent();
+
+    /// @notice Error thrown when trying to add an existing agent as an agent.
+    error UserAlreadyAnAgent();
+
     /// @notice Error thrown when trying to whitelist a user that's already whitelisted.
     error UserAlreadyWhitelisted();
 
