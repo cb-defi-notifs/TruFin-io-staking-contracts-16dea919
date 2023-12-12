@@ -162,13 +162,18 @@ describe("RESTAKE", () => {
     it("if validator restake fails, treasury fees on deposit are computed with correct sharePrice", async () => {
       // mock validator
       const newValidator = await smock.fake(constants.VALIDATOR_SHARE_ABI);
+
+      // new validator always returns 1 MATIC as rewards to mimic a failed restake
       newValidator.getLiquidRewards.returns(parseEther(1));
+
+      // new validator returns deposited amount as totalStaked amount
+      let depositAmt = parseEther(5e6);
+      newValidator.buyVoucher.returns(depositAmt);
 
       // add the new validator
       await staker.addValidator(newValidator.address);
 
       // deposit some MATIC into the default and new validator
-      let depositAmt = parseEther(5e6);
       await staker.connect(one).deposit(depositAmt);
       await staker.connect(one).depositToSpecificValidator(depositAmt, newValidator.address);
 
