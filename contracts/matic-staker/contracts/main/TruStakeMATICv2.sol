@@ -22,6 +22,8 @@ import {IMasterWhitelist} from "../interfaces/IMasterWhitelist.sol";
 
 uint256 constant PHI_PRECISION = 1e4;
 uint256 constant MAX_EPSILON = 1e12;
+uint256 constant ONE_MATIC = 1e18;
+uint256 constant SHARE_PRICE_PRECISION = 1e22;
 
 /// @title TruStakeMATICv2
 /// @notice An auto-compounding liquid staking MATIC vault with reward-allocating functionality.
@@ -95,7 +97,7 @@ contract TruStakeMATICv2 is
         phi = _phi;
         distPhi = _distPhi;
         epsilon = 1e4;
-        minDeposit = 1e18; // default minimum is 1 MATIC
+        minDeposit = ONE_MATIC; // default minimum is 1 MATIC
 
         emit StakerInitialized(
             _stakingTokenAddress,
@@ -166,7 +168,7 @@ contract TruStakeMATICv2 is
     /// @notice Sets the lower deposit limit.
     /// @param _newMinDeposit New minimum amount of MATIC one has to deposit (default 1e18 = 1 MATIC).
     function setMinDeposit(uint256 _newMinDeposit) external onlyOwner {
-        if (_newMinDeposit < 1e18) revert MinDepositTooSmall();
+        if (_newMinDeposit < ONE_MATIC) revert MinDepositTooSmall();
 
         emit SetMinDeposit(minDeposit, _newMinDeposit);
         minDeposit = _newMinDeposit;
@@ -271,7 +273,7 @@ contract TruStakeMATICv2 is
         // can only allocate up to allocator's balance
         if (_amount > maxWithdraw(msg.sender)) revert InsufficientDistributorBalance();
 
-        if (_amount < 1e18) revert AllocationUnderOneMATIC();
+        if (_amount < ONE_MATIC) revert AllocationUnderOneMATIC();
 
         // variables up here for stack too deep issues
         uint256 individualAmount;
@@ -296,17 +298,17 @@ contract TruStakeMATICv2 is
                 // if this adds to an existing allocation, update the individual allocation
 
                 individualAmount = oldIndividualAllocationMaticAmount + _amount;
-                individualPriceNum = oldIndividualAllocationMaticAmount * 1e22 + _amount * 1e22;
+                individualPriceNum = oldIndividualAllocationMaticAmount * SHARE_PRICE_PRECISION + _amount * SHARE_PRICE_PRECISION;
 
                 individualPriceDenom =
                     MathUpgradeable.mulDiv(
-                        oldIndividualAllocationMaticAmount * 1e22,
+                        oldIndividualAllocationMaticAmount * SHARE_PRICE_PRECISION,
                         oldIndividualAllocation.sharePriceDenom,
                         oldIndividualAllocation.sharePriceNum,
                         MathUpgradeable.Rounding.Down
                     ) +
                     MathUpgradeable.mulDiv(
-                        _amount * 1e22,
+                        _amount * SHARE_PRICE_PRECISION,
                         globalPriceDenom,
                         globalPriceNum,
                         MathUpgradeable.Rounding.Down
@@ -341,7 +343,7 @@ contract TruStakeMATICv2 is
             individualMaticAmount -= _amount;
         }
 
-        if (individualMaticAmount < 1e18 && individualMaticAmount != 0) revert AllocationUnderOneMATIC();
+        if (individualMaticAmount < ONE_MATIC && individualMaticAmount != 0) revert AllocationUnderOneMATIC();
 
         // check if this is a complete deallocation
         if (individualMaticAmount == 0) {
@@ -608,19 +610,19 @@ contract TruStakeMATICv2 is
 
             sharePriceDenom =
                 MathUpgradeable.mulDiv(
-                    totalAllocatedAmount * 1e22,
+                    totalAllocatedAmount * SHARE_PRICE_PRECISION,
                     sharePriceDenom,
                     sharePriceNum,
                     MathUpgradeable.Rounding.Up
                 ) +
                 MathUpgradeable.mulDiv(
-                    allocation.maticAmount * 1e22,
+                    allocation.maticAmount * SHARE_PRICE_PRECISION,
                     allocation.sharePriceDenom,
                     allocation.sharePriceNum,
                     MathUpgradeable.Rounding.Up
                 );
 
-            sharePriceNum = totalAllocatedAmount * 1e22 + allocation.maticAmount * 1e22;
+            sharePriceNum = totalAllocatedAmount * SHARE_PRICE_PRECISION + allocation.maticAmount * SHARE_PRICE_PRECISION;
             totalAllocatedAmount += allocation.maticAmount;
         }
         return Allocation(totalAllocatedAmount, sharePriceNum, sharePriceDenom);
@@ -728,7 +730,7 @@ contract TruStakeMATICv2 is
 
         // If remaining user balance is below 1 MATIC, entire balance is withdrawn and all shares
         // are burnt. We allow the user to withdraw their deposited amount + epsilon
-        if (maxWithdrawal - _amount < 1e18) {
+        if (maxWithdrawal - _amount < ONE_MATIC) {
             _amount = maxWithdrawal;
             shareDecreaseUser = balanceOf(_user);
         }
