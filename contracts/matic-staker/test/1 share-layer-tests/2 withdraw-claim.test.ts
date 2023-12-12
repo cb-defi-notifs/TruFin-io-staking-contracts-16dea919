@@ -265,6 +265,52 @@ describe("WITHDRAW CLAIM", () => {
       expect(await staker.connect(one).getAllValidators()).to.deep.equal([
         [constants.VALIDATOR_STATE.ENABLED, parseEther(7000), validatorShare.address]])
     });
+
+    it("emits the WithdrawalClaimed event", async () => {
+      // advance by 80 epochs
+      await advanceEpochs(stakeManager, 80);
+
+      // claim with user one
+      await expect(staker.connect(one).withdrawClaim(unbondNonce, validatorShare.address))
+        .to.emit(staker, "WithdrawalClaimed").withArgs(
+          one.address,
+          validatorShare.address,
+          unbondNonce,
+          parseEther(3000),
+          parseEther(3000),
+        );
+    });
+
+    it("sends no MATIC to the user when no MATIC is received from the validator", async () => {
+      // add a mocked validator
+      const mockedValidator = await smock.fake(constants.VALIDATOR_SHARE_ABI);
+      await staker.addValidator(mockedValidator.address);
+
+      // deposit to mocked validator
+      await staker.connect(one).depositToSpecificValidator(parseEther(1000), mockedValidator.address);
+
+      // initiate withdrawal with user one
+      await staker.connect(one).withdrawFromSpecificValidator(parseEther(1000), mockedValidator.address);
+
+      const unbondNonce = await staker.getUnbondNonce(mockedValidator.address);
+      const balanceBefore = await token.balanceOf(one.address);
+
+      // Claim the withdrawal and verify WithdrawalClaimed event was emitted.
+      // The mocked validator doesn't send MATIC back to the staker therefore the WithdrawalClaimed event
+      // logs that 1000 MATIC were claimed and 0 MATIC were transferred to the user.
+      await expect(
+        staker.connect(one).withdrawClaim(unbondNonce, mockedValidator.address)
+      ).to.emit(staker, "WithdrawalClaimed").withArgs(
+        one.address,
+        mockedValidator.address,
+        unbondNonce,
+        parseEther(1000),
+        parseEther(0),
+      );
+
+      // verify no MATIC was sent to the user
+      expect((await token.balanceOf(one.address)).sub(balanceBefore)).to.equal(0);
+    });
   });
 
   describe("User: claimList", async () => {

@@ -783,12 +783,12 @@ contract TruStakeMATICv2 is
         if (withdrawal.user != msg.sender) revert SenderMustHaveInitiatedWithdrawalRequest();
 
         // claim will revert if unbonding not finished for this unbond nonce
-        _claimStake(_unbondNonce, _validator);
+        uint256 receivedAmount = _claimStake(_unbondNonce, _validator);
 
         // transfer claimed MATIC to claimer
-        IERC20Upgradeable(stakingTokenAddress).safeTransfer(msg.sender, withdrawal.amount);
+        IERC20Upgradeable(stakingTokenAddress).safeTransfer(msg.sender, receivedAmount);
 
-        emit WithdrawalClaimed(msg.sender, _validator, _unbondNonce, withdrawal.amount);
+        emit WithdrawalClaimed(msg.sender, _validator, _unbondNonce, withdrawal.amount, receivedAmount);
     }
 
     /// @notice Validator function that transfers the _amount to the stake manager and stakes the assets onto the validator.
@@ -811,8 +811,11 @@ contract TruStakeMATICv2 is
     /// @notice Internal function for claiming the MATIC from a withdrawal request made previously.
     /// @param _unbondNonce Unbond nonce of the withdrawal request being claimed.
     /// @param _validator Address of the validator to claim from.
-    function _claimStake(uint256 _unbondNonce, address _validator) private {
+    /// @return The amount of MATIC received by the vault from the validator.
+    function _claimStake(uint256 _unbondNonce, address _validator) private returns (uint256) {
+        uint256 assetsBefore = totalAssets();
         IValidatorShare(_validator).unstakeClaimTokens_new(_unbondNonce);
+        return totalAssets() - assetsBefore;
     }
 
     /// @notice Calls the validator share contract's restake functionality on all enabled validators

@@ -72,12 +72,14 @@ interface ITruStakeMATICv2 {
     /// @param _validator Address of the validator the withdrawal was claimed from.
     /// @param _unbondNonce Nonce of the original withdrawal request, which was passed
     /// into the `withdrawClaim` function.
-    /// @param _amount Amount of MATIC claimed from staker (originally from stake manager).
+    /// @param _claimedAmount Amount of MATIC claimed by the user.
+    /// @param _transferredAmount Amount of MATIC transferred to the user (originally from stake manager).
     event WithdrawalClaimed(
         address indexed _user,
         address indexed _validator,
         uint256 indexed _unbondNonce,
-        uint256 _amount
+        uint256 _claimedAmount,
+        uint256 _transferredAmount
     );
 
     // global tracking

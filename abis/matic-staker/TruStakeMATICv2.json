@@ -646,7 +646,13 @@
       {
         "indexed": false,
         "internalType": "uint256",
-        "name": "_amount",
+        "name": "_claimedAmount",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "_transferredAmount",
         "type": "uint256"
       }
     ],
