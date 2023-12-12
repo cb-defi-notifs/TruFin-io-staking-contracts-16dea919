@@ -874,7 +874,7 @@ contract TruStakeMATICv2 is
         }
 
         if (_inMatic) {
-            uint256 maticAmount = previewRedeem(sharesToMove);
+            uint256 maticAmount = convertToAssets(sharesToMove);
             // transfer staking token from distributor to recipient
             IERC20Upgradeable(stakingTokenAddress).safeTransferFrom(_distributor, _recipient, maticAmount);
         } else {

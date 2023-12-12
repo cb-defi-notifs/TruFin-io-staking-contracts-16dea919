@@ -455,7 +455,7 @@ describe("DISTRIBUTION", () => {
         let truMaticAmount = await staker.balanceOf(recipientTwo.address);
 
         // when distributing to user1 in MATIC, they should receive the equivalent amount as User2
-        let maticAmount =  await staker.previewRedeem(truMaticAmount);
+        let maticAmount =  await staker.convertToAssets(truMaticAmount);
         await expect(
           staker.connect(allocatorOne).distributeRewards(recipientOne.address, true)
         ).to.changeTokenBalance(token, recipientOne, maticAmount);
@@ -508,7 +508,7 @@ describe("DISTRIBUTION", () => {
         await staker.connect(allocatorOne).distributeAll(true);
 
         // expect recipients balance to have increased be the equivalent MATIC amount
-        let maticAmount =  await staker.previewRedeem(truMaticAmount);
+        let maticAmount =  await staker.convertToAssets(truMaticAmount);
         expect(await token.balanceOf(recipientOne.address)).to.equal(preBalanceOne.add(maticAmount));
         expect(await token.balanceOf(recipientTwo.address)).to.equal(preBalanceTwo.add(maticAmount));
 
