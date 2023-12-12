@@ -244,18 +244,17 @@ contract TruStakeMATICv2 is
     /// withdrawals, as they are taken from delegated MATIC and not its rewards.
     /// @param _validator Address of the validator where MATIC in the vault should be staked to.
     function compoundRewards(address _validator) external nonReentrant {
-        uint256 amountRestaked = totalRewards();
-        uint256 totalAssetBalance = totalAssets();
+        (uint256 globalPriceNum, uint256 globalPriceDenom) = sharePrice();
+        uint256 amountRestaked = _restake();
+
         // To keep share price constant when rewards are staked, new shares need to be minted
-        uint256 shareIncrease = convertToShares(totalStaked() + totalAssetBalance + amountRestaked) - totalSupply();
+        uint256 shareIncrease = (amountRestaked * phi * 1e18 * globalPriceDenom) / (globalPriceNum * PHI_PRECISION);
 
-        _restake();
-
-         // Minted shares are given to the treasury to effectively take a fee
+        // Minted shares are given to the treasury to effectively take a fee
         _mint(treasuryAddress, shareIncrease);
 
         // if there is MATIC in the vault, stake it with the provided validator
-        if (totalAssetBalance > 0) {
+        if (totalAssets() > 0) {
             _deposit(address(0), 0, _validator);
         }
 
@@ -821,14 +820,16 @@ contract TruStakeMATICv2 is
     /// @notice Calls the validator share contract's restake functionality on all enabled validators
     /// to turn earned rewards into staked MATIC.
     /// @dev Logs a RestakeError event when an exception occurs while calling restake on a validator.
-    function _restake() private {
+    function _restake() private returns (uint256) {
         uint256 validatorCount = validatorAddresses.length;
+        uint256 totalAmountRestaked;
         for (uint256 i; i < validatorCount; ) {
             address validator = validatorAddresses[i];
             if (validators[validator].state == ValidatorState.ENABLED) {
                 // log an event on "Too small rewards to restake" and other exceptions
                 try IValidatorShare(validator).restake() returns (uint256 amountRestaked, uint256) {
                     validators[validator].stakedAmount += amountRestaked;
+                    totalAmountRestaked += amountRestaked;
                 } catch Error(string memory reason) {
                     emit RestakeError(validator, reason);
                 }
@@ -838,6 +839,7 @@ contract TruStakeMATICv2 is
                 ++i;
             }
         }
+        return totalAmountRestaked;
     }
 
     /// @notice Distributes the rewards related to the allocation made to that receiver.
