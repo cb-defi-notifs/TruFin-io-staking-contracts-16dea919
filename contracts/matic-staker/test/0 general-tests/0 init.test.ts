@@ -34,6 +34,7 @@ describe("INIT", () => {
         BigNumber.from(1),
       ]);
       expect(await staker.validatorAddresses(0)).to.equal(validatorShare.address);
+      expect(await staker.defaultValidatorAddress()).to.equal(validatorShare.address);
       // todo: update this with new/all global vars
     });
 

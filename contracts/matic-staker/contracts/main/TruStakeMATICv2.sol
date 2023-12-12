@@ -87,6 +87,7 @@ contract TruStakeMATICv2 is
         // Initialize contract state
         stakingTokenAddress = _stakingTokenAddress;
         stakeManagerContractAddress = _stakeManagerContractAddress;
+        defaultValidatorAddress = _validator;
         validatorAddresses.push(_validator);
         validators[_validator].state = ValidatorState.ENABLED;
         whitelistAddress = _whitelistAddress;
