@@ -284,6 +284,8 @@ describe("WITHDRAW CLAIM", () => {
     it("sends no MATIC to the user when no MATIC is received from the validator", async () => {
       // add a mocked validator
       const mockedValidator = await smock.fake(constants.VALIDATOR_SHARE_ABI);
+      mockedValidator.buyVoucher.returns(parseEther(1000));
+
       await staker.addValidator(mockedValidator.address);
 
       // deposit to mocked validator
