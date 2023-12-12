@@ -796,7 +796,7 @@ contract TruStakeMATICv2 is
         validators[_validator].stakedAmount += amountToDeposit;
     }
 
-    /// @notice Requests to unstake a certain amount of MATIC from the default validator.
+    /// @notice Requests to unstake a certain amount of MATIC from the specified validator.
     /// @param _amount Amount of MATIC to initiate the unstaking of.
     /// @param _validator Address of the validator to unstake from.
     function _unbond(uint256 _amount, address _validator) private returns (uint256) {
