@@ -428,6 +428,7 @@ contract TruStakeMATICv2 is
     /// @dev The MATIC is staked with the default validator.
     /// @return The resulting amount of TruMATIC shares minted to the caller.
     function deposit(uint256 _assets) public onlyWhitelist nonReentrant returns (uint256) {
+        if (_assets < minDeposit) revert DepositBelowMinDeposit();
         return _deposit(msg.sender, _assets, defaultValidatorAddress);
     }
 
@@ -439,6 +440,7 @@ contract TruStakeMATICv2 is
         uint256 _assets,
         address _validator
     ) public onlyWhitelist nonReentrant returns (uint256) {
+        if (_assets < minDeposit) revert DepositBelowMinDeposit();
         return _deposit(msg.sender, _assets, _validator);
     }
 
@@ -676,8 +678,6 @@ contract TruStakeMATICv2 is
     /// @param _amount Amount to be deposited.
     /// @param _validator Address of the validator to stake to.
     function _deposit(address _user, uint256 _amount, address _validator) private returns (uint256) {
-        if (_amount < minDeposit && _amount > 0) revert DepositBelowMinDeposit();
-
         if (validators[_validator].state != ValidatorState.ENABLED) revert ValidatorNotEnabled();
 
         (uint256 globalPriceNum, uint256 globalPriceDenom) = sharePrice();

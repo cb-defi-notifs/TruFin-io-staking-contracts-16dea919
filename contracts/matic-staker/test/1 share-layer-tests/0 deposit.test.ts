@@ -210,18 +210,12 @@ describe("DEPOSIT", () => {
     expect(await staker.balanceOf(two.address)).to.equal(parseEther(5000));
   });
 
-  it("deposit zero MATIC", async () => {
-    // was blocked, now should work
-    await staker
-      .connect(one)
-      .deposit(parseEther(0))
+  it("depositing zero MATIC should fail", async () => {
+    await expect(staker.connect(one).deposit(parseEther(0))).to.be.revertedWithCustomError(staker, "DepositBelowMinDeposit")
   });
 
-  it("deposit zero MATIC to specific validator", async () => {
-    // was blocked, now should work
-    await staker
-      .connect(one)
-    ["depositToSpecificValidator(uint256,address)"](parseEther(0), validatorShare.address);
+  it("depositing zero MATIC to specific validator should fail", async () => {
+    await expect(staker.connect(one).depositToSpecificValidator(parseEther(0), validatorShare.address)).to.be.revertedWithCustomError(staker, "DepositBelowMinDeposit")
   });
 
   it("Can withdraw maxWithdraw amount", async () => {
@@ -266,15 +260,6 @@ describe("DEPOSIT", () => {
         .connect(nonWhitelistedUser)
         .deposit(parseEther(1e18))
     ).to.be.revertedWithCustomError(staker, "UserNotWhitelisted");
-  });
-
-  it("user cannot drain vault by depositing zero", async () => {
-    // deposit 0
-    await staker.connect(one).deposit(parseEther(0))
-    // balance remains zero
-    expect(await staker.balanceOf(one.address)).to.equal(0);
-    // maxWithdraw of zero forbidden
-    expect(await staker.maxWithdraw(one.address)).to.equal(0);
   });
 
   it("user cannot deposit less than the minDeposit", async () => {
@@ -359,22 +344,6 @@ describe("DEPOSIT", () => {
     ).to.be.revertedWithCustomError(staker, "UserNotWhitelisted");
   });
 
-  it("user cannot drain vault by depositing zero to a specific validator", async () => {
-    // mock validator
-    const newValidator = await smock.fake(constants.VALIDATOR_SHARE_ABI);
-    await staker.connect(deployer).addValidator(newValidator.address);
-
-    // deposit 0
-    await staker.connect(one).depositToSpecificValidator(
-        parseEther(0),
-        newValidator.address
-      )
-    // balance remains zero
-    expect(await staker.balanceOf(one.address)).to.equal(0);
-    // maxWithdraw of zero forbidden
-    expect(await staker.maxWithdraw(one.address)).to.equal(0);
-  });
-
   it("user cannot deposit less than the minDeposit to  specific validator", async () => {
     // mock validator
     const newValidator = await smock.fake(constants.VALIDATOR_SHARE_ABI);
@@ -388,18 +357,6 @@ describe("DEPOSIT", () => {
         parseEther(1e3),
         newValidator.address
       )).to.be.revertedWithCustomError(staker, "DepositBelowMinDeposit")
-  });
-
-
-  it("deposit zero MATIC to a specific validator", async () => {
-    // mock validator
-    const newValidator = await smock.fake(constants.VALIDATOR_SHARE_ABI);
-    await staker.connect(deployer).addValidator(newValidator.address);
-
-    // was blocked, now should work
-    await staker
-      .connect(one)
-    ["depositToSpecificValidator(uint256,address)"](parseEther(0), newValidator.address);
   });
 
   it("when depositing, the treasury is only minted shares for claimed rewards", async () => {
