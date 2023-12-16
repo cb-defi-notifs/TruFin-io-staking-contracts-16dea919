@@ -155,6 +155,42 @@ describe("RESTAKE", () => {
         preStakeTotalStaked.add(preStakeClaimedRewards).add(preStakeTotalRewards)
       );
     });
+    
+    it("After slashing, treasury is minted fees for all rewards", async () => {
+      // deposit some MATIC
+      let depositAmt = parseEther(5e6);
+      await staker
+        .connect(one)
+        .deposit(depositAmt);
+
+      // mock validator
+      const newValidator = await smock.fake(constants.VALIDATOR_SHARE_ABI);
+      await staker.addValidator(newValidator.address);
+      // new validator returns deposited amount as totalStaked amount
+      newValidator.buyVoucher.returns(depositAmt);
+
+      // deposit some MATIC into the new validator
+      await staker.connect(one).depositToSpecificValidator(depositAmt, newValidator.address);
+
+      // new staker returns different amounts for amountStaked and liquidRewards
+       newValidator.restake.returns([parseEther(10), parseEther(11)]);
+
+      // increase rewards
+      await submitCheckpoint(0);
+
+      let treasuryBalanceBefore = await staker.balanceOf(treasury.address);
+      let defaultValidatorRewards = await staker.getRewardsFromValidator(validatorShare.address);
+      let sharePricePreCompound = await staker.sharePrice();
+
+      // calculate the expected shares minted for restaking
+      const sharesMintedForRestake = (defaultValidatorRewards.add(parseEther(11))).mul(constants.PHI).mul(parseEther(1)).mul(sharePricePreCompound[1]).div((sharePricePreCompound[0].mul(constants.PHI_PRECISION)));
+
+      // stake claimed rewards - no additional shares should be minted for depositing claimed rewards
+      await staker.connect(deployer).compoundRewards(validatorShare.address);
+
+      // ensure treasury was transferred correct amount of shares
+      expect((await staker.balanceOf(treasury.address)).sub(treasuryBalanceBefore)).to.equal(sharesMintedForRestake);
+    });
 
     it("if validator restake fails, treasury fees on deposit are computed with correct sharePrice", async () => {
       // mock validator

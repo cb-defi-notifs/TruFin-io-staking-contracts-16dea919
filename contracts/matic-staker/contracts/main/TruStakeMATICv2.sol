@@ -827,9 +827,9 @@ contract TruStakeMATICv2 is
             address validator = validatorAddresses[i];
             if (validators[validator].state == ValidatorState.ENABLED) {
                 // log an event on "Too small rewards to restake" and other exceptions
-                try IValidatorShare(validator).restake() returns (uint256 amountRestaked, uint256) {
+                try IValidatorShare(validator).restake() returns (uint256 amountRestaked, uint256 liquidRewards) {
                     validators[validator].stakedAmount += amountRestaked;
-                    totalAmountRestaked += amountRestaked;
+                    totalAmountRestaked += liquidRewards;
                 } catch Error(string memory reason) {
                     emit RestakeError(validator, reason);
                 }
