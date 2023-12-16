@@ -68,6 +68,9 @@ abstract contract TruStakeMATICv2Storage {
     /// @notice Mapping to keep track of the withdrawals (user, amount) for each unbond nonce for each validator.
     mapping(address => mapping(uint256 => Withdrawal)) public withdrawals;
 
+    /// @notice Mapping of users to the private validator they have access to.
+    mapping(address => address) public usersPrivateAccess;
+
     /// @notice Gap for upgradeability.
-    uint256[44] private __gap;
+    uint256[43] private __gap;
 }

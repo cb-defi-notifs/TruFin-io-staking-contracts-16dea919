@@ -2,12 +2,12 @@
 
 import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
 import { expect } from "chai";
+import { ethers } from "hardhat";
 import * as constants from "../helpers/constants";
 import { deployment } from "../helpers/fixture";
 import { divSharePrice, parseEther } from "../helpers/math";
 import { submitCheckpoint } from "../helpers/state-interaction";
-import { parse } from "path";
-import { BigNumber } from "@ethersproject/bignumber";
+
 import { smock } from '@defi-wonderland/smock';
 
 describe("DEPOSIT", () => {
@@ -281,16 +281,16 @@ describe("DEPOSIT", () => {
   it("updates validator struct correctly post deposit", async () => {
     await staker.connect(one).deposit(parseEther(1e6));
 
-    expect(await staker.connect(one).getAllValidators()).to.deep.equal([
-      [constants.VALIDATOR_STATE.ENABLED, parseEther(1e6), validatorShare.address]])
-    });
-
+    expect(await staker.connect(one).getAllValidators()).to.deep.equal(
+      [[constants.VALIDATOR_STATE.ENABLED, parseEther(1e6), validatorShare.address, false]]
+    )
+  });
 
   it("user can deposit to specific validator", async () => {
     // mock validator
     const newValidator = await smock.fake(constants.VALIDATOR_SHARE_ABI);
     newValidator.buyVoucher.returns(parseEther(1));
-    await staker.connect(deployer).addValidator(newValidator.address);
+    await staker.connect(deployer).addValidator(newValidator.address, false);
 
     // deposit to specific validator
     await staker.connect(one).depositToSpecificValidator(parseEther(1), newValidator.address);
@@ -307,7 +307,7 @@ describe("DEPOSIT", () => {
   it("user can deposit the minDeposit exactly to a specific validator", async () => {
     // mock validator
     const newValidator = await smock.fake(constants.VALIDATOR_SHARE_ABI);
-    await staker.connect(deployer).addValidator(newValidator.address);
+    await staker.connect(deployer).addValidator(newValidator.address, false);
 
     // lower deposit limit set to 10,000 MATIC
     await staker.connect(deployer).setMinDeposit(parseEther(1e4));
@@ -322,7 +322,7 @@ describe("DEPOSIT", () => {
   it("unknown non-whitelist user deposit to  specific validator fails", async () => {
     // mock validator
     const newValidator = await smock.fake(constants.VALIDATOR_SHARE_ABI);
-    await staker.connect(deployer).addValidator(newValidator.address);
+    await staker.connect(deployer).addValidator(newValidator.address, false);
 
     await expect(
       staker.connect(nonWhitelistedUser).depositToSpecificValidator(parseEther(1e18), newValidator.address)
@@ -332,7 +332,7 @@ describe("DEPOSIT", () => {
   it("unknown non-whitelist user cannot deposit to specific validator to a whitelisted user's address", async () => {
     // mock validator
     const newValidator = await smock.fake(constants.VALIDATOR_SHARE_ABI);
-    await staker.connect(deployer).addValidator(newValidator.address);
+    await staker.connect(deployer).addValidator(newValidator.address, false);
 
     await expect(
       staker
@@ -347,7 +347,7 @@ describe("DEPOSIT", () => {
   it("user cannot deposit less than the minDeposit to  specific validator", async () => {
     // mock validator
     const newValidator = await smock.fake(constants.VALIDATOR_SHARE_ABI);
-    await staker.connect(deployer).addValidator(newValidator.address);
+    await staker.connect(deployer).addValidator(newValidator.address, false);
 
     // lower deposit limit set to 10,000 MATIC
     await staker.connect(deployer).setMinDeposit(parseEther(1e4));
@@ -362,7 +362,7 @@ describe("DEPOSIT", () => {
   it("when depositing, the treasury is only minted shares for claimed rewards", async () => {
     // deposit to two different validators
     await staker.connect(one).deposit(parseEther(100));
-    await staker.connect(deployer).addValidator(validatorShare2.address);
+    await staker.connect(deployer).addValidator(validatorShare2.address, false);
     await staker.connect(one).depositToSpecificValidator(parseEther(100), validatorShare2.address);
 
     // accrue rewards
@@ -391,6 +391,115 @@ describe("DEPOSIT", () => {
     await staker.connect(two).deposit(parseEther(200));
     expect(await staker.balanceOf(treasury.address)).to.equal(treasuryBalanceAfter);
   });
+
+  describe("Validator Access", () => {
+    let validator, privateValidator;
+
+    beforeEach(async () => {
+      // add a non-private validator
+      validator = await smock.fake(constants.VALIDATOR_SHARE_ABI);
+      await staker.connect(deployer).addValidator(validator.address, false);
+
+      // add a private validator
+      privateValidator = await smock.fake(constants.VALIDATOR_SHARE_ABI);
+      await staker.connect(deployer).addValidator(privateValidator.address, true);
+    });
+
+    describe("deposit", () => {
+      describe("user with non-private access", () => {
+        beforeEach(async () => {
+          expect((await staker.validators(privateValidator.address)).isPrivate).is.true
+          expect((await staker.validators( await staker.defaultValidatorAddress() )).isPrivate).is.false
+          expect(await staker.usersPrivateAccess(one.address)).is.equal(ethers.constants.AddressZero);
+        });
+
+        it("can deposit to a non-private validator", async () => {
+          await expect(
+            staker.connect(one).deposit(parseEther(5000))
+          ).to.not.be.reverted;
+        });
+
+        it("should revert when depositing on a private validator", async () => {
+          await staker.connect(deployer).setDefaultValidator(privateValidator.address);
+          expect((await staker.validators(await staker.defaultValidatorAddress())).isPrivate).is.true
+
+          await expect(
+            staker.connect(one).deposit(parseEther(5000))
+          ).to.be.revertedWithCustomError(staker, "ValidatorAccessDenied");
+        });
+      });
+
+      describe("user with private access", () => {
+        beforeEach(async () => {
+          expect((await staker.validators(validator.address)).isPrivate).is.false
+          expect((await staker.validators(privateValidator.address)).isPrivate).is.true
+
+          await staker.connect(deployer).givePrivateAccess(one.address, privateValidator.address);
+          expect(await staker.usersPrivateAccess(one.address)).is.equal(privateValidator.address);
+        });
+
+        it("can deposit to their private validator", async () => {
+          await staker.connect(deployer).setDefaultValidator(privateValidator.address);
+
+          await expect(
+            staker.connect(one).deposit(parseEther(5000))
+          ).to.not.be.reverted;
+        });
+
+        it("should revert when depositing on a validator that is not their private one", async () => {
+          await expect(
+            staker.connect(one).deposit(parseEther(5000))
+          ).to.be.revertedWithCustomError(staker, "ValidatorAccessDenied");
+        });
+      });
+    });
+
+    describe("depositToSpecificValidator", () => {
+      describe("user with non-private access", () => {
+        beforeEach(async () => {
+          expect((await staker.validators(validator.address)).isPrivate).is.false
+          expect((await staker.validators(privateValidator.address)).isPrivate).is.true
+          expect(await staker.usersPrivateAccess(one.address)).is.equal(ethers.constants.AddressZero);
+        });
+
+        it("can deposit to a non-private validator", async () => {
+          await expect(
+            staker.connect(one).depositToSpecificValidator(parseEther(5000), validator.address)
+          ).to.not.be.reverted;
+        });
+
+        it("should revert when depositing on a private validator", async () => {
+          await expect(
+            staker.connect(one).depositToSpecificValidator(parseEther(5000), privateValidator.address)
+          ).to.be.revertedWithCustomError(staker, "ValidatorAccessDenied");
+        });
+      });
+
+      describe("user with private-access", () => {
+        beforeEach(async () => {
+          expect((await staker.validators(validator.address)).isPrivate).is.false
+          expect((await staker.validators(privateValidator.address)).isPrivate).is.true
+
+          await staker.connect(deployer).givePrivateAccess(one.address, privateValidator.address);
+          expect(await staker.usersPrivateAccess(one.address)).is.equal(privateValidator.address);
+        });
+
+        it("can deposit to their private validator", async () => {
+          await expect(
+            staker.connect(one).depositToSpecificValidator(parseEther(5000), privateValidator.address)
+          ).to.not.be.reverted;
+        });
+
+        it("should revert when depositing on a validator that is not their private one", async () => {
+          await expect(
+            staker.connect(one).depositToSpecificValidator(parseEther(5000), validator.address)
+          ).to.be.revertedWithCustomError(staker, "ValidatorAccessDenied");
+        });
+
+      });
+    });
+  });
+
 });
 
 // TODO: organise tests

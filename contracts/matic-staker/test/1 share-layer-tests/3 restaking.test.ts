@@ -155,7 +155,7 @@ describe("RESTAKE", () => {
         preStakeTotalStaked.add(preStakeClaimedRewards).add(preStakeTotalRewards)
       );
     });
-    
+
     it("After slashing, treasury is minted fees for all rewards", async () => {
       // deposit some MATIC
       let depositAmt = parseEther(5e6);
@@ -165,7 +165,7 @@ describe("RESTAKE", () => {
 
       // mock validator
       const newValidator = await smock.fake(constants.VALIDATOR_SHARE_ABI);
-      await staker.addValidator(newValidator.address);
+      await staker.addValidator(newValidator.address, false);
       // new validator returns deposited amount as totalStaked amount
       newValidator.buyVoucher.returns(depositAmt);
 
@@ -204,7 +204,7 @@ describe("RESTAKE", () => {
       newValidator.buyVoucher.returns(depositAmt);
 
       // add the new validator
-      await staker.addValidator(newValidator.address);
+      await staker.addValidator(newValidator.address, false);
 
       // deposit some MATIC into the default and new validator
       await staker.connect(one).deposit(depositAmt);
@@ -253,7 +253,7 @@ describe("RESTAKE", () => {
       newValidator.buyVoucher.returns(depositAmt);
 
       // add the new validator
-      await staker.addValidator(newValidator.address);
+      await staker.addValidator(newValidator.address, false);
 
       // deposit some MATIC into the default and new validator
       await staker.connect(one).deposit(depositAmt);
@@ -281,7 +281,7 @@ describe("RESTAKE", () => {
 
     it("compoundRewards correctly updates staked amount", async () => {
        // add a new validator
-       await staker.addValidator(validatorShare2.address);
+       await staker.addValidator(validatorShare2.address, false);
 
       // deposit some MATIC into the default and new validator
       let depositAmt = parseEther(5e6);
@@ -335,7 +335,7 @@ describe("RESTAKE", () => {
 
     it("stakes MATIC present in the vault with the selected validator", async () => {
       // add a new validator
-      await staker.addValidator(validatorShare2.address);
+      await staker.addValidator(validatorShare2.address, false);
 
       // set some MATIC in the vault
       const maticAmount = parseEther(1000);
@@ -355,7 +355,7 @@ describe("RESTAKE", () => {
 
     it("reverts when the selected validator is disabled", async () => {
       // add a new validator
-      await staker.addValidator(validatorShare2.address);
+      await staker.addValidator(validatorShare2.address, false);
       await staker.disableValidator(validatorShare2.address);
 
       // set some MATIC in the vault
@@ -416,7 +416,7 @@ describe("RESTAKE", () => {
 
     it("restakes liquid rewards on multiple validators", async () => {
       // add a second validator
-      await staker.addValidator(validatorShare2.address);
+      await staker.addValidator(validatorShare2.address, false);
 
       // stake on both validators
       await staker.connect(one).depositToSpecificValidator(parseEther(1e6), validatorShare.address);
@@ -447,6 +447,19 @@ describe("RESTAKE", () => {
 
       expect(stakeOnFirstValidator).to.equal(stakeOnFirstValidatorAfterDeposit.add(rewardsOnFirstValidator))
       expect(stakeOnSecondValidator).to.equal(stakeOnSecondValidatorAfterDeposit.add(rewardsOnSecondValidator))
+    });
+
+    it("reverts when staking vault's assets on a private validator", async () => {
+      // add a private validator
+      await staker.addValidator(validatorShare2.address, true);
+
+      // set some MATIC in the vault
+      const maticAmount = parseEther(1000);
+      await setTokenBalance(token, staker.address, maticAmount);
+
+      // calling compoundRewards with the private validator should revert
+      await expect(staker.connect(deployer).compoundRewards(validatorShare2.address))
+        .to.be.revertedWithCustomError(staker, "ValidatorAccessDenied");
     });
   });
 });

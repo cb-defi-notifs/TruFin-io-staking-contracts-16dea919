@@ -208,7 +208,7 @@ describe("WITHDRAW CLAIM", () => {
 
     it("claim withdrawal from a different validator than was deposited into", async () => {
       // add a new validator
-      await staker.connect(deployer).addValidator(validatorShare2.address);
+      await staker.connect(deployer).addValidator(validatorShare2.address, false);
       // deposit into the new validator with user two
       await staker.connect(two).depositToSpecificValidator(parseEther(10000), validatorShare2.address);
 
@@ -263,7 +263,7 @@ describe("WITHDRAW CLAIM", () => {
 
       // expect amountStaked on validator to decrease by amount claimed
       expect(await staker.connect(one).getAllValidators()).to.deep.equal([
-        [constants.VALIDATOR_STATE.ENABLED, parseEther(7000), validatorShare.address]])
+        [constants.VALIDATOR_STATE.ENABLED, parseEther(7000), validatorShare.address, false]])
     });
 
     it("emits the WithdrawalClaimed event", async () => {
@@ -286,7 +286,7 @@ describe("WITHDRAW CLAIM", () => {
       const mockedValidator = await smock.fake(constants.VALIDATOR_SHARE_ABI);
       mockedValidator.buyVoucher.returns(parseEther(1000));
 
-      await staker.addValidator(mockedValidator.address);
+      await staker.addValidator(mockedValidator.address, false);
 
       // deposit to mocked validator
       await staker.connect(one).depositToSpecificValidator(parseEther(1000), mockedValidator.address);

@@ -147,7 +147,7 @@ interface ITruStakeMATICv2 {
 
     event SetMinDeposit(uint256 indexed _oldMinDeposit, uint256 indexed _newMinDeposit);
 
-    event ValidatorAdded(address indexed _validator, uint256 _stakedAmount);
+    event ValidatorAdded(address indexed _validator, uint256 _stakedAmount, bool _isPrivate);
 
     event ValidatorStateChanged(
         address indexed _validator,
@@ -156,6 +156,12 @@ interface ITruStakeMATICv2 {
     );
 
     event RestakeError(address indexed _validator, string _reason);
+
+    event PrivateAccessGiven(address indexed _user, address indexed _validator);
+
+    event PrivateAccessRemoved(address indexed _user, address indexed _validator);
+
+    event ValidatorPrivacyChanged(address indexed _validator, bool _oldIsPrivate, bool _newIsPrivate);
 
     // --- Errors ---
 
@@ -198,7 +204,7 @@ interface ITruStakeMATICv2 {
     /// share price is the same as the current share price.
     error NothingToDistribute();
 
-     /// @notice Error thrown when no recipients are found to distribute to.
+    /// @notice Error thrown when no recipients are found to distribute to.
     error NoRecipientsFound();
 
     /// @notice Error thrown when the distribution fee is higher than the fee precision.
@@ -224,4 +230,22 @@ interface ITruStakeMATICv2 {
 
     /// @notice Error thrown when trying to perform actions on a non-existent validator.
     error ValidatorDoesNotExist();
+
+    /// @notice Error thrown when trying to give private validator access to a user who already got it.
+    error PrivateAccessAlreadyGiven();
+
+    /// @notice Error thrown when trying to remove private validator access to a user who hasn't got it.
+    error PrivateAccessNotGiven();
+
+    /// @notice Error thrown when trying to give a user private access to a validator that is non-private.
+    error ValidatorNotPrivate();
+
+    /// @notice Error thrown when a user is trying to access a validator they should not access.
+    error ValidatorAccessDenied();
+
+    /// @notice Error thrown when trying to set private status on an private validator.
+    error ValidatorAlreadyPrivate();
+
+    /// @notice Error thrown when trying to remove private status on a non-private validator.
+    error ValidatorAlreadyNonPrivate();
 }

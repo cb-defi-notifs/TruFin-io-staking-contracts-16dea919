@@ -144,50 +144,77 @@ describe("Validators", () => {
     let newValidator;
     let addValidatorTx;
 
-    beforeEach(async () => {
-      // setup a mock validator with a pre-existing stake
-      newValidator = await smock.fake(constants.VALIDATOR_SHARE_ABI);
-      newValidator.getTotalStake.returns([parseEther(123), 1]);
-      addValidatorTx = await staker.connect(deployer).addValidator(newValidator.address);
-    });
+    describe("non-private", async () => {
+      beforeEach(async () => {
+        // setup a mock validator with a pre-existing stake
+        newValidator = await smock.fake(constants.VALIDATOR_SHARE_ABI);
+        newValidator.getTotalStake.returns([parseEther(123), 1]);
+        addValidatorTx = await staker.connect(deployer).addValidator(newValidator.address, false);
+      });
 
-    it("Adds a new validator", async () => {
-      const validators = await staker.getValidators();
-      const lastAddedAddress = validators[validators.length - 1]
+      it("Adds a new validator", async () => {
+        const validators = await staker.getValidators();
+        const lastAddedAddress = validators[validators.length - 1]
 
-      expect(lastAddedAddress).to.equal(newValidator.address);
-      const validator = await staker.validators(newValidator.address);
-      expect(validator.state).to.equal(constants.VALIDATOR_STATE.ENABLED);
-    });
+        expect(lastAddedAddress).to.equal(newValidator.address);
+        const validator = await staker.validators(newValidator.address);
+        expect(validator.state).to.equal(constants.VALIDATOR_STATE.ENABLED);
+        expect(validator.isPrivate).to.be.false
+      });
 
-    it("Sets the amount staked on the validator", async () => {
-      // verify that the staked amount in the staker's Validator struct matches the pre-existing stake
-      const [,stakedAmount,] = await staker.validators(newValidator.address);
-      await expect(stakedAmount).to.equal(parseEther(123));
-    });
+      it("Sets the amount staked on the validator", async () => {
+        // verify that the staked amount in the staker's Validator struct matches the pre-existing stake
+        const [,stakedAmount,] = await staker.validators(newValidator.address);
+        await expect(stakedAmount).to.equal(parseEther(123));
+      });
 
-    it("Emits the expected event", async () => {
-      await expect(addValidatorTx).to.emit(staker, "ValidatorAdded")
-        .withArgs(newValidator.address, parseEther(123));
-    });
+      it("Emits the expected event", async () => {
+        await expect(addValidatorTx).to.emit(staker, "ValidatorAdded")
+          .withArgs(newValidator.address, parseEther(123), false);
+      });
 
-    it("Reverts with zero address", async () => {
-      await expect(
-        staker.connect(deployer).addValidator(ethers.constants.AddressZero)
-      ).to.be.revertedWithCustomError(staker,"ZeroAddressNotSupported");
-    });
+      it("Reverts with zero address", async () => {
+        await expect(
+          staker.connect(deployer).addValidator(ethers.constants.AddressZero, false)
+        ).to.be.revertedWithCustomError(staker,"ZeroAddressNotSupported");
+      });
 
-    it("Reverts with an existing address", async () => {
-      await expect(
-        staker.connect(deployer).addValidator(newValidator.address)
-      ).to.be.revertedWithCustomError(staker, "ValidatorAlreadyExists");
-    });
+      it("Reverts with an existing address", async () => {
+        await expect(
+          staker.connect(deployer).addValidator(newValidator.address, false)
+        ).to.be.revertedWithCustomError(staker, "ValidatorAlreadyExists");
+      });
 
-    it("Reverts when the caller is not the owner", async () => {
-      await expect(
-        staker.connect(one).addValidator(two.address)
-      ).to.be.revertedWith("Ownable: caller is not the owner");
-    });
+      it("Reverts when the caller is not the owner", async () => {
+        await expect(
+          staker.connect(one).addValidator(two.address, false)
+        ).to.be.revertedWith("Ownable: caller is not the owner");
+      });
+    })
+
+    describe("private", async () => {
+      beforeEach(async () => {
+        // add a private validator
+        newValidator = await smock.fake(constants.VALIDATOR_SHARE_ABI);
+        addValidatorTx = await staker.connect(deployer).addValidator(newValidator.address, true);
+      });
+
+      it("Adds a private validator", async () => {
+        const validators = await staker.getValidators();
+        const lastAddedAddress = validators[validators.length - 1]
+
+        expect(lastAddedAddress).to.equal(newValidator.address);
+        const validator = await staker.validators(newValidator.address);
+        expect(validator.state).to.equal(constants.VALIDATOR_STATE.ENABLED);
+        expect(validator.isPrivate).to.be.true
+      });
+
+      it("Emits the expected event", async () => {
+        await expect(addValidatorTx).to.emit(staker, "ValidatorAdded")
+          .withArgs(newValidator.address, 0, true);
+      });
+    })
+
   });
 
   describe("disableValidator", async () => {
@@ -288,7 +315,7 @@ describe("Validators", () => {
       newValidator.getTotalStake.returns([parseEther(123), 1]);
 
       // add the new validator to enable it
-      await staker.connect(deployer).addValidator(newValidator.address);
+      await staker.connect(deployer).addValidator(newValidator.address, false);
 
       // set it as the default validator
       await staker.connect(deployer).setDefaultValidator(newValidator.address);
@@ -314,11 +341,193 @@ describe("Validators", () => {
     it("Reverts with a non-enabled validated", async () => {
       let newValidator = await smock.fake(constants.VALIDATOR_SHARE_ABI);
       newValidator.getTotalStake.returns([parseEther(123), 1]);
-      await staker.connect(deployer).addValidator(newValidator.address);
+      await staker.connect(deployer).addValidator(newValidator.address, false);
       await staker.connect(deployer).disableValidator(newValidator.address);
       await expect(
         staker.connect(deployer).setDefaultValidator(newValidator.address)
       ).to.be.revertedWithCustomError(staker, "ValidatorNotEnabled");
+    });
+  });
+
+  describe("changeValidatorPrivacy", async () => {
+    describe("set to private", async () => {
+      it("Sets the validator to private", async () => {
+        await staker.connect(deployer).changeValidatorPrivacy(validatorShare.address, true);
+
+        const validator = await staker.validators(validatorShare.address);
+        expect(validator.isPrivate).to.be.true
+      });
+
+      it("Emits the expected event", async () => {
+        const tx = await staker.connect(deployer).changeValidatorPrivacy(validatorShare.address, true);
+
+        await expect(tx).to.emit(staker, "ValidatorPrivacyChanged")
+          .withArgs(validatorShare.address, false, true);
+      });
+
+      it("Reverts with a private validator address", async () => {
+        await staker.connect(deployer).changeValidatorPrivacy(validatorShare.address, true);
+
+        await expect(
+          staker.connect(deployer).changeValidatorPrivacy(validatorShare.address, true)
+        ).to.be.revertedWithCustomError(staker, "ValidatorAlreadyPrivate");
+      });
+    });
+
+    describe("set to non-private", async () => {
+      beforeEach(async () => {
+        await staker.connect(deployer).changeValidatorPrivacy(validatorShare.address, true);
+        expect((await staker.validators(validatorShare.address)).isPrivate).to.be.true
+      });
+
+      it("Sets the validator to non-private", async () => {
+        await staker.connect(deployer).changeValidatorPrivacy(validatorShare.address, false);
+
+        const validator = await staker.validators(validatorShare.address);
+        expect(validator.isPrivate).to.be.false
+      });
+
+      it("Emits the expected event", async () => {
+        const tx = await staker.connect(deployer).changeValidatorPrivacy(validatorShare.address, false);
+
+        await expect(tx).to.emit(staker, "ValidatorPrivacyChanged")
+          .withArgs(validatorShare.address, true, false);
+      });
+
+      it("Reverts with a non-private validator address", async () => {
+        await staker.connect(deployer).changeValidatorPrivacy(validatorShare.address, false);
+        expect((await staker.validators(validatorShare.address)).isPrivate).to.be.false
+
+        await expect(
+          staker.connect(deployer).changeValidatorPrivacy(validatorShare.address, false)
+        ).to.be.revertedWithCustomError(staker, "ValidatorAlreadyNonPrivate");
+      });
+    });
+
+    describe("failure checks", async () => {
+      it("Reverts with zero address", async () => {
+        await expect(
+          staker.connect(deployer).changeValidatorPrivacy(ethers.constants.AddressZero, true)
+        ).to.be.revertedWithCustomError(staker,"ValidatorDoesNotExist");
+      });
+
+      it("Reverts with an unknown validator address", async () => {
+        await expect(
+          staker.connect(deployer).changeValidatorPrivacy(one.address, true)
+        ).to.be.revertedWithCustomError(staker, "ValidatorDoesNotExist");
+      });
+
+      it("Reverts when the caller is not the owner", async () => {
+        await expect(
+          staker.connect(one).changeValidatorPrivacy(validatorShare.address, true)
+        ).to.be.revertedWith("Ownable: caller is not the owner");
+      });
+    });
+
+  });
+
+});
+
+describe("Validator Access", () => {
+  let deployer, one, two, staker, validator, privateValidator;
+
+  beforeEach(async () => {
+    ({ deployer, one, two, staker } = await loadFixture(deployment));
+
+    // add a non-private validator
+    validator = await smock.fake(constants.VALIDATOR_SHARE_ABI);
+    await staker.connect(deployer).addValidator(validator.address, false);
+
+    // add a private validator
+    privateValidator = await smock.fake(constants.VALIDATOR_SHARE_ABI);
+    await staker.connect(deployer).addValidator(privateValidator.address, true);
+  });
+
+  describe("givePrivateAccess", async () => {
+    it("Gives a user private access to a private validator", async () => {
+      expect(await staker.usersPrivateAccess(one.address)).to.equal(ethers.constants.AddressZero);
+      await staker.connect(deployer).givePrivateAccess(one.address, privateValidator.address);
+
+      expect(await staker.usersPrivateAccess(one.address)).to.equal(privateValidator.address);
+    });
+
+    it("Reverts when the caller is not the owner", async () => {
+      await expect(
+        staker.connect(two).givePrivateAccess(one.address, privateValidator.address)
+      ).to.be.revertedWith("Ownable: caller is not the owner");
+    });
+
+    it("Reverts with zero address for user", async () => {
+      await expect(
+        staker.connect(deployer).givePrivateAccess(ethers.constants.AddressZero, privateValidator.address)
+      ).to.be.revertedWithCustomError(staker,"ZeroAddressNotSupported");
+    });
+
+    it("Reverts when validator does not exist", async () => {
+      await expect(
+        staker.connect(deployer).givePrivateAccess(one.address, two.address)
+      ).to.be.revertedWithCustomError(staker,"ValidatorDoesNotExist");
+    });
+
+    it("Reverts when already has private access", async () => {
+      await staker.connect(deployer).givePrivateAccess(one.address, privateValidator.address)
+      expect(await staker.usersPrivateAccess(one.address)).to.equal(privateValidator.address);
+
+      await expect(
+        staker.connect(deployer).givePrivateAccess(one.address, privateValidator.address)
+      ).to.be.revertedWithCustomError(staker,"PrivateAccessAlreadyGiven");
+    });
+
+    it("Reverts when non-private validator", async () => {
+      await expect(
+        staker.connect(deployer).givePrivateAccess(one.address, validator.address)
+      ).to.be.revertedWithCustomError(staker,"ValidatorNotPrivate");
+    });
+
+    it("Emits the expected event", async () => {
+      await expect(
+        staker.connect(deployer).givePrivateAccess(one.address, privateValidator.address)
+      ).to.emit(staker, "PrivateAccessGiven")
+        .withArgs(one.address, privateValidator.address);
+    });
+  });
+
+  describe("removePrivateAccess", async () => {
+    beforeEach(async () => {
+      // give user private access to privateValidator
+      await staker.connect(deployer).givePrivateAccess(one.address, privateValidator.address);
+      expect(await staker.usersPrivateAccess(one.address)).to.equal(privateValidator.address);
+    });
+
+    it("Remove private validator access from user", async () => {
+      await staker.connect(deployer).removePrivateAccess(one.address);
+
+      expect(await staker.usersPrivateAccess(one.address)).to.equal(ethers.constants.AddressZero);
+    });
+
+    it("Reverts when the caller is not the owner", async () => {
+      await expect(
+        staker.connect(two).removePrivateAccess(one.address)
+      ).to.be.revertedWith("Ownable: caller is not the owner");
+    });
+
+    it("Reverts with zero address", async () => {
+      await expect(
+        staker.connect(deployer).removePrivateAccess(ethers.constants.AddressZero)
+      ).to.be.revertedWithCustomError(staker,"PrivateAccessNotGiven");
+    });
+
+    it("Reverts when user does not have private access to a validator", async () => {
+      await expect(
+        staker.connect(deployer).removePrivateAccess(two.address)
+      ).to.be.revertedWithCustomError(staker,"PrivateAccessNotGiven");
+    });
+
+    it("Emits the expected event", async () => {
+      await expect(
+        await staker.connect(deployer).removePrivateAccess(one.address)
+      ).to.emit(staker, "PrivateAccessRemoved")
+        .withArgs(one.address, privateValidator.address);
     });
   });
 });

@@ -24,7 +24,7 @@ describe("Reentrancy Attack", () => {
       await token.connect(mallory).transfer(attacker.address, maticAmount);
 
       // add attacker as validator
-      await staker.connect(deployer).addValidator(attacker.address);
+      await staker.connect(deployer).addValidator(attacker.address, false);
 
       await expect(
         attacker.connect(mallory).attack(maticAmount)
@@ -40,7 +40,7 @@ describe("Reentrancy Attack", () => {
       await token.connect(mallory).transfer(attacker2.address, maticAmount);
 
       // add attacker as validator
-      await staker.connect(deployer).addValidator(attacker2.address);
+      await staker.connect(deployer).addValidator(attacker2.address, false);
 
       await expect(
         attacker2.connect(mallory).attack(maticAmount)

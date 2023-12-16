@@ -61,6 +61,16 @@
   },
   {
     "inputs": [],
+    "name": "PrivateAccessAlreadyGiven",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "PrivateAccessNotGiven",
+    "type": "error"
+  },
+  {
+    "inputs": [],
     "name": "SenderMustHaveInitiatedWithdrawalRequest",
     "type": "error"
   },
@@ -71,7 +81,22 @@
   },
   {
     "inputs": [],
+    "name": "ValidatorAccessDenied",
+    "type": "error"
+  },
+  {
+    "inputs": [],
     "name": "ValidatorAlreadyExists",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "ValidatorAlreadyNonPrivate",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "ValidatorAlreadyPrivate",
     "type": "error"
   },
   {
@@ -87,6 +112,11 @@
   {
     "inputs": [],
     "name": "ValidatorNotEnabled",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "ValidatorNotPrivate",
     "type": "error"
   },
   {
@@ -331,6 +361,44 @@
       }
     ],
     "name": "OwnershipTransferred",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "_user",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "_validator",
+        "type": "address"
+      }
+    ],
+    "name": "PrivateAccessGiven",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "_user",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "_validator",
+        "type": "address"
+      }
+    ],
+    "name": "PrivateAccessRemoved",
     "type": "event"
   },
   {
@@ -592,9 +660,40 @@
         "internalType": "uint256",
         "name": "_stakedAmount",
         "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "bool",
+        "name": "_isPrivate",
+        "type": "bool"
       }
     ],
     "name": "ValidatorAdded",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "_validator",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "bool",
+        "name": "_oldIsPrivate",
+        "type": "bool"
+      },
+      {
+        "indexed": false,
+        "internalType": "bool",
+        "name": "_newIsPrivate",
+        "type": "bool"
+      }
+    ],
+    "name": "ValidatorPrivacyChanged",
     "type": "event"
   },
   {
@@ -720,6 +819,11 @@
         "internalType": "address",
         "name": "_validator",
         "type": "address"
+      },
+      {
+        "internalType": "bool",
+        "name": "_isPrivate",
+        "type": "bool"
       }
     ],
     "name": "addValidator",
@@ -849,6 +953,48 @@
       }
     ],
     "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_user",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "_validator",
+        "type": "address"
+      }
+    ],
+    "name": "canAccessValidator",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_validator",
+        "type": "address"
+      },
+      {
+        "internalType": "bool",
+        "name": "_isPrivate",
+        "type": "bool"
+      }
+    ],
+    "name": "changeValidatorPrivacy",
+    "outputs": [],
+    "stateMutability": "nonpayable",
     "type": "function"
   },
   {
@@ -1223,6 +1369,11 @@
             "internalType": "address",
             "name": "validatorAddress",
             "type": "address"
+          },
+          {
+            "internalType": "bool",
+            "name": "isPrivate",
+            "type": "bool"
           }
         ],
         "internalType": "struct Validator[]",
@@ -1411,6 +1562,47 @@
     "type": "function"
   },
   {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_user",
+        "type": "address"
+      }
+    ],
+    "name": "getUserValidators",
+    "outputs": [
+      {
+        "components": [
+          {
+            "internalType": "enum ValidatorState",
+            "name": "state",
+            "type": "uint8"
+          },
+          {
+            "internalType": "uint256",
+            "name": "stakedAmount",
+            "type": "uint256"
+          },
+          {
+            "internalType": "address",
+            "name": "validatorAddress",
+            "type": "address"
+          },
+          {
+            "internalType": "bool",
+            "name": "isPrivate",
+            "type": "bool"
+          }
+        ],
+        "internalType": "struct Validator[]",
+        "name": "",
+        "type": "tuple[]"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
     "inputs": [],
     "name": "getValidators",
     "outputs": [
@@ -1421,6 +1613,24 @@
       }
     ],
     "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_user",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "_validator",
+        "type": "address"
+      }
+    ],
+    "name": "givePrivateAccess",
+    "outputs": [],
+    "stateMutability": "nonpayable",
     "type": "function"
   },
   {
@@ -1650,6 +1860,19 @@
       }
     ],
     "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_user",
+        "type": "address"
+      }
+    ],
+    "name": "removePrivateAccess",
+    "outputs": [],
+    "stateMutability": "nonpayable",
     "type": "function"
   },
   {
@@ -1965,6 +2188,25 @@
   {
     "inputs": [
       {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "name": "usersPrivateAccess",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
         "internalType": "uint256",
         "name": "",
         "type": "uint256"
@@ -2005,6 +2247,11 @@
         "internalType": "address",
         "name": "validatorAddress",
         "type": "address"
+      },
+      {
+        "internalType": "bool",
+        "name": "isPrivate",
+        "type": "bool"
       }
     ],
     "stateMutability": "view",

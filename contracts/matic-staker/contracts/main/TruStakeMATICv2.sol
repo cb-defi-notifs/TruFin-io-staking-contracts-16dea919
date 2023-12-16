@@ -176,9 +176,10 @@ contract TruStakeMATICv2 is
 
     /// @notice Adds a new validator to the list of validators supported by the Staker.
     /// @param _validator The share contract address of the validator to add.
+    /// @param _isPrivate A boolean indicating whether access to the validator is limited to some users.
     /// @dev Newly added validators are considered enabled by default.
     /// @dev This function reverts when a validator with the same share contract address already exists.
-    function addValidator(address _validator) external onlyOwner {
+    function addValidator(address _validator, bool _isPrivate) external onlyOwner {
         _checkNotZeroAddress(_validator);
 
         if (validators[_validator].state != ValidatorState.NONE) revert ValidatorAlreadyExists();
@@ -188,8 +189,9 @@ contract TruStakeMATICv2 is
         (uint256 stakedAmount, ) = IValidatorShare(_validator).getTotalStake(address(this));
         validators[_validator].state = ValidatorState.ENABLED;
         validators[_validator].stakedAmount = stakedAmount;
+        validators[_validator].isPrivate = _isPrivate;
 
-        emit ValidatorAdded(_validator, stakedAmount);
+        emit ValidatorAdded(_validator, stakedAmount, _isPrivate);
     }
 
     /// @notice Disable an enabled validator to prevent depositing and staking to it.
@@ -214,6 +216,48 @@ contract TruStakeMATICv2 is
         validators[_validator].state = ValidatorState.ENABLED;
 
         emit ValidatorStateChanged(_validator, ValidatorState.DISABLED, ValidatorState.ENABLED);
+    }
+
+    /// @notice Gives a user private access to a validator.
+    /// @param _user The user address.
+    /// @param _validator The private validator address.
+    function givePrivateAccess(address _user, address _validator) external onlyOwner {
+        _checkNotZeroAddress(_user);
+        Validator memory validator = validators[_validator];
+        if (validator.state == ValidatorState.NONE) revert ValidatorDoesNotExist();
+        if (!validator.isPrivate) revert ValidatorNotPrivate();
+        if (usersPrivateAccess[_user] != address(0)) revert PrivateAccessAlreadyGiven();
+
+        usersPrivateAccess[_user] = _validator;
+
+        emit PrivateAccessGiven(_user, _validator);
+    }
+
+    /// @notice Removes private access to a private validator from a user.
+    /// @param _user The user address.
+    function removePrivateAccess(address _user) external onlyOwner {
+        address oldValidator = usersPrivateAccess[_user];
+        if (oldValidator == address(0)) revert PrivateAccessNotGiven();
+
+        delete usersPrivateAccess[_user];
+
+        emit PrivateAccessRemoved(_user, oldValidator);
+    }
+
+    /// @notice Changes the privacy status of a validator.
+    /// @param _validator The validator address.
+    /// @param _isPrivate Whether the validator should be private or not.
+    function changeValidatorPrivacy(address _validator, bool _isPrivate) external onlyOwner {
+        Validator storage validator = validators[_validator];
+        if (validator.state == ValidatorState.NONE) revert ValidatorDoesNotExist();
+
+        bool oldIsPrivate = validator.isPrivate;
+        if(oldIsPrivate && _isPrivate) revert ValidatorAlreadyPrivate();
+        if(!oldIsPrivate && !_isPrivate) revert ValidatorAlreadyNonPrivate();
+
+        validator.isPrivate = _isPrivate;
+
+        emit ValidatorPrivacyChanged(_validator, oldIsPrivate, _isPrivate);
     }
 
     /// @notice Claims a previously requested and now unbonded withdrawal.
@@ -242,6 +286,7 @@ contract TruStakeMATICv2 is
     /// stakes MATIC lingering in the vault to the validator provided.
     /// @dev Can be called manually to prevent the rewards surpassing reserves. This could lead to insufficient funds for
     /// withdrawals, as they are taken from delegated MATIC and not its rewards.
+    /// @dev This method should prevent staking the vault's assets on a private validator where they can't be withdrawn by non-private users.
     /// @param _validator Address of the validator where MATIC in the vault should be staked to.
     function compoundRewards(address _validator) external nonReentrant {
         (uint256 globalPriceNum, uint256 globalPriceDenom) = sharePrice();
@@ -422,6 +467,21 @@ contract TruStakeMATICv2 is
         return withdrawalPresent && epochsPassed;
     }
 
+    /// @notice Returns whether a user can access a validator.
+    /// @dev A private validator can only be accessed by its users.
+    /// Users who are not mapped to a private validator can only access validators that are not private.
+    /// @param _user The user address.
+    /// @param _validator The validator address.
+    /// @return True if the user can access the validator, false otherwise.
+    function canAccessValidator(address _user, address _validator) external view returns (bool) {
+        _checkNotZeroAddress(_user);
+        _checkNotZeroAddress(_validator);
+        Validator memory validator = validators[_validator];
+        if (validator.state == ValidatorState.NONE) revert ValidatorDoesNotExist();
+
+        return _canAccessValidator(_user, _validator);
+    }
+
     // *** PUBLIC METHODS ***
     /// @notice Deposits an amount of caller->-vault approved MATIC into the vault.
     /// @param _assets The amount of MATIC to deposit.
@@ -462,7 +522,6 @@ contract TruStakeMATICv2 is
         address _validator
     ) public onlyWhitelist nonReentrant returns (uint256, uint256) {
         if (validators[_validator].state == ValidatorState.NONE) revert ValidatorDoesNotExist();
-
         return _withdrawRequest(msg.sender, _assets, _validator);
     }
 
@@ -557,6 +616,32 @@ contract TruStakeMATICv2 is
             }
         }
         return validatorArray;
+    }
+
+    /// @notice Retrieves information for the validators a user can access.
+    /// @param _user Address of the user.
+    /// @return An array of structs containing details for each validator a user can access.
+    function getUserValidators(address _user) public view returns (Validator[] memory) {
+
+        // find the validators the user has access to
+        Validator[] memory validators = getAllValidators();
+        Validator[] memory userValidatorsAll = new Validator[](validators.length);
+        uint256 userValidatorCount;
+        for (uint256 i; i < validators.length; i++) {
+            address validatorAddress = validators[i].validatorAddress;
+            if (_canAccessValidator(_user, validatorAddress)) {
+                userValidatorsAll[userValidatorCount] = validators[i];
+                userValidatorCount++;
+            }
+        }
+
+        // filter out zero items in userValidatorsAll
+        Validator[] memory userValidators = new Validator[](userValidatorCount);
+        for (uint256 i; i < userValidatorCount; i++) {
+            userValidators[i] = userValidatorsAll[i];
+        }
+
+        return userValidators;
     }
 
     /// @notice Gets the total unclaimed MATIC rewards on a specific validator.
@@ -678,6 +763,7 @@ contract TruStakeMATICv2 is
     /// @param _amount Amount to be deposited.
     /// @param _validator Address of the validator to stake to.
     function _deposit(address _user, uint256 _amount, address _validator) private returns (uint256) {
+        if (!_canAccessValidator(_user, _validator)) revert ValidatorAccessDenied();
         if (validators[_validator].state != ValidatorState.ENABLED) revert ValidatorNotEnabled();
 
         (uint256 globalPriceNum, uint256 globalPriceDenom) = sharePrice();
@@ -715,6 +801,7 @@ contract TruStakeMATICv2 is
     /// @param _amount The amount to be withdrawn.
     /// @param _validator Address of the validator to withdraw from.
     function _withdrawRequest(address _user, uint256 _amount, address _validator) private returns (uint256, uint256) {
+        if (!_canAccessValidator(_user, _validator)) revert ValidatorAccessDenied();
         if (_amount == 0) revert WithdrawalRequestAmountCannotEqualZero();
 
         uint256 maxWithdrawal = maxWithdraw(_user);
@@ -934,6 +1021,19 @@ contract TruStakeMATICv2 is
     function _convertToAssets(uint256 shares, MathUpgradeable.Rounding rounding) private view returns (uint256) {
         (uint256 globalPriceNum, uint256 globalPriceDenom) = sharePrice();
         return MathUpgradeable.mulDiv(shares, globalPriceNum, globalPriceDenom * 1e18, rounding);
+    }
+
+    /// @notice Returns whether a user can access a validator.
+    /// @param _user The user address.
+    /// @param _validator The validator address.
+    /// @return True if the user can access the validator, false otherwise.
+    function _canAccessValidator(address _user, address _validator) private view returns (bool) {
+        address privateValidator = usersPrivateAccess[_user];
+        if (privateValidator == address(0)) {
+            return validators[_validator].isPrivate == false;
+        }
+
+        return privateValidator == _validator;
     }
 
     /// @notice Checks whether an address is the zero address.

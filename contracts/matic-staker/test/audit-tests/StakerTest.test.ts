@@ -263,7 +263,7 @@ describe("Staker", () => {
 
     it(`When not owner tries to add a validator`, async () => {
       await expect(
-        staker.connect(user1).addValidator(user1.address)
+        staker.connect(user1).addValidator(user1.address, false)
       ).to.be.revertedWith("Ownable: caller is not the owner");
     });
 
