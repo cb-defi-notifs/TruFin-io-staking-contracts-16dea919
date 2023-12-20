@@ -106,6 +106,11 @@
   },
   {
     "inputs": [],
+    "name": "ValidatorHasAssets",
+    "type": "error"
+  },
+  {
+    "inputs": [],
     "name": "ValidatorNotDisabled",
     "type": "error"
   },

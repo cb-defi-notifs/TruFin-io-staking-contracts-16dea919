@@ -372,6 +372,13 @@ describe("Validators", () => {
           staker.connect(deployer).changeValidatorPrivacy(validatorShare.address, true)
         ).to.be.revertedWithCustomError(staker, "ValidatorAlreadyPrivate");
       });
+
+      it("Reverts with a public validator address having >= 1 MATIC of assets staked before privatisation", async () => {
+        await staker.connect(one).deposit(parseEther(1));
+        await expect(
+          staker.connect(deployer).changeValidatorPrivacy(validatorShare.address, true)
+        ).to.be.revertedWithCustomError(staker, "ValidatorHasAssets");
+      })
     });
 
     describe("set to non-private", async () => {

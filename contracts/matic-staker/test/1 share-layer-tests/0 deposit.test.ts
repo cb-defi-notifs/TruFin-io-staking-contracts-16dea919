@@ -427,6 +427,13 @@ describe("DEPOSIT", () => {
             staker.connect(one).deposit(parseEther(5000))
           ).to.be.revertedWithCustomError(staker, "ValidatorAccessDenied");
         });
+
+        it("can deposit on a private validator when it has been made public", async () => {
+          await staker.connect(deployer).setDefaultValidator(privateValidator.address);
+          expect((await staker.validators(await staker.defaultValidatorAddress())).isPrivate).is.true
+          await staker.connect(deployer).changeValidatorPrivacy(privateValidator.address, false);
+          await expect(staker.connect(one).deposit(parseEther(5000))).to.not.be.reverted;
+        });
       });
 
       describe("user with private access", () => {
@@ -450,6 +457,11 @@ describe("DEPOSIT", () => {
           await expect(
             staker.connect(one).deposit(parseEther(5000))
           ).to.be.revertedWithCustomError(staker, "ValidatorAccessDenied");
+        });
+
+        it("can deposit to any validator once their validator is made public", async () => {
+          await staker.connect(deployer).changeValidatorPrivacy(privateValidator.address, false);
+          await expect(staker.connect(one).deposit(parseEther(5000))).to.not.be.reverted;
         });
       });
     });

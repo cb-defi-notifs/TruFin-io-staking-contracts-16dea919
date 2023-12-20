@@ -31,7 +31,7 @@ contract MaliciousValidator_Withdraw is IValidatorShare {
     //  that allow to re-enter any nonReentrant functions in the same transaction
     function buyVoucher(uint256 _amount, uint256 _minSharesToMint) external returns (uint256 amountToDeposit) {}
 
-    function sellVoucher_new(uint256 claimAmount, uint256 maximumSharesToBurn) external {
+    function sellVoucher_new(uint256 /*claimAmount*/, uint256 /*maximumSharesToBurn*/) external {
         maticToken.approve(address(staker), halfDeposit);
         staker.withdrawFromSpecificValidator(halfDeposit, address(this));
     }

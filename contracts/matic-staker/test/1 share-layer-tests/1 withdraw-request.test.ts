@@ -12,12 +12,12 @@ import { submitCheckpoint } from "../helpers/state-interaction";
 describe("WITHDRAW REQUEST", () => {
   // Initial state, deposits, rewards compounding already tested
 
-  let treasury, deployer, one, nonWhitelistedUser, validatorShare2, staker, validatorShare;
+  let treasury, deployer, one, two, nonWhitelistedUser, validatorShare2, staker, validatorShare;
   let TREASURY_INITIAL_DEPOSIT;
 
   beforeEach(async () => {
     // reset to fixture
-    ({ treasury, deployer, one, nonWhitelistedUser, validatorShare2, staker, validatorShare } = await loadFixture(deployment));
+    ({ treasury, deployer, one, two, nonWhitelistedUser, validatorShare2, staker, validatorShare } = await loadFixture(deployment));
     TREASURY_INITIAL_DEPOSIT = parseEther(100)
     await staker.connect(treasury).deposit(TREASURY_INITIAL_DEPOSIT);
   });
@@ -263,6 +263,9 @@ describe("WITHDRAW REQUEST", () => {
       // add a private validator
       privateValidator = await smock.fake(constants.VALIDATOR_SHARE_ABI);
       await staker.connect(deployer).addValidator(privateValidator.address, true);
+
+      await staker.connect(deployer).givePrivateAccess(two.address, privateValidator.address);
+      expect(await staker.usersPrivateAccess(two.address)).is.equal(privateValidator.address);
     });
 
     describe("withdraw", () => {
@@ -273,6 +276,7 @@ describe("WITHDRAW REQUEST", () => {
           expect(await staker.usersPrivateAccess(one.address)).is.equal(ethers.constants.AddressZero);
 
           await staker.connect(one).deposit(parseEther(10000));
+          privateValidator.buyVoucher.returns(parseEther(10000));
         });
 
         it("can withdraw from a non-private validator", async () => {
@@ -289,33 +293,46 @@ describe("WITHDRAW REQUEST", () => {
             staker.connect(one).withdraw(parseEther(10000))
           ).to.be.revertedWithCustomError(staker, "ValidatorAccessDenied");
         });
+
+        it("can withdraw from a private validator when it is made public", async () => {
+          await staker.connect(two).depositToSpecificValidator(parseEther(10000), privateValidator.address);
+          await staker.connect(deployer).changeValidatorPrivacy(privateValidator.address, false);
+          await expect(
+            staker.connect(one).withdrawFromSpecificValidator(parseEther(50), privateValidator.address)
+          ).to.not.be.reverted;
+        });
       });
 
       describe("user with private access", () => {
         beforeEach(async () => {
           expect((await staker.validators(validator.address)).isPrivate).is.false
           expect((await staker.validators(privateValidator.address)).isPrivate).is.true
-
-          await staker.connect(deployer).givePrivateAccess(one.address, privateValidator.address);
-          expect(await staker.usersPrivateAccess(one.address)).is.equal(privateValidator.address);
+          expect(await staker.usersPrivateAccess(two.address)).is.equal(privateValidator.address);
 
           await staker.connect(deployer).setDefaultValidator(privateValidator.address);
           privateValidator.buyVoucher.returns(parseEther(10000));
-          await staker.connect(one).deposit(parseEther(10000));
+          validator.buyVoucher.returns(parseEther(10000));
+          await staker.connect(two).deposit(parseEther(10000));
         });
 
         it("can withdraw from their private validator", async () => {
           await expect(
-            staker.connect(one).withdraw(parseEther(5000))
+            staker.connect(two).withdraw(parseEther(5000))
           ).to.not.be.reverted;
         });
 
         it("should revert when withdrawing from a validator that is not their private one", async () => {
-          await staker.connect(deployer).setDefaultValidator(validator.address);
-
           await expect(
-            staker.connect(one).withdraw(parseEther(5000))
+            staker.connect(two).withdrawFromSpecificValidator(parseEther(5000), validator.address)
           ).to.be.revertedWithCustomError(staker, "ValidatorAccessDenied");
+        });
+
+        it("can withdraw from any validator when theirs is made public", async () => {
+          await staker.connect(deployer).changeValidatorPrivacy(privateValidator.address, false);
+          await staker.connect(one).depositToSpecificValidator(parseEther(10000), validator.address);
+          await expect(
+            staker.connect(two).withdrawFromSpecificValidator(parseEther(5000), validator.address)
+          ).to.not.be.reverted;
         });
       });
     });

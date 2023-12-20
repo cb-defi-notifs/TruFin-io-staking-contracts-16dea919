@@ -244,6 +244,18 @@ describe("GETTERS", () => {
             [constants.VALIDATOR_STATE.ENABLED, parseEther(30000).toString(), anotherPrivateValidator.address, true],
           ])
         });
+
+        it("get all public validators if their private validator is changed to public", async () => {
+          await staker.connect(deployer).changeValidatorPrivacy(privateValidator.address, false);
+          expect(await staker.getUserValidators(two.address)).to.deep.equal([
+            [constants.VALIDATOR_STATE.ENABLED, parseEther(0).toString(), validatorShare.address, false],
+            [constants.VALIDATOR_STATE.ENABLED, parseEther(10000).toString(), validator.address, false],
+            [constants.VALIDATOR_STATE.ENABLED, parseEther(20000).toString(), privateValidator.address, false],
+          ]);
+          expect(await staker.connect(one).getUserValidators(three.address)).to.deep.equal([
+            [constants.VALIDATOR_STATE.ENABLED, parseEther(30000).toString(), anotherPrivateValidator.address, true],
+          ]);
+        });
       });
 
       describe("zero address", () => {

@@ -255,6 +255,9 @@ contract TruStakeMATICv2 is
         if(oldIsPrivate && _isPrivate) revert ValidatorAlreadyPrivate();
         if(!oldIsPrivate && !_isPrivate) revert ValidatorAlreadyNonPrivate();
 
+        // check assets are zero before privatising. Otherwise, assets on validator would be limited to private users.
+        if (!oldIsPrivate && validator.stakedAmount >= ONE_MATIC) revert ValidatorHasAssets();
+
         validator.isPrivate = _isPrivate;
 
         emit ValidatorPrivacyChanged(_validator, oldIsPrivate, _isPrivate);
@@ -1029,11 +1032,14 @@ contract TruStakeMATICv2 is
     /// @return True if the user can access the validator, false otherwise.
     function _canAccessValidator(address _user, address _validator) private view returns (bool) {
         address privateValidator = usersPrivateAccess[_user];
-        if (privateValidator == address(0)) {
-            return validators[_validator].isPrivate == false;
+
+        if (validators[privateValidator].isPrivate == true) {
+             // if the user is limited to a private validator, only that validator is accessible
+             return privateValidator == _validator;
         }
 
-        return privateValidator == _validator;
+        // otherwise, non-private validators are accessible, private validators are not
+        return !validators[_validator].isPrivate;
     }
 
     /// @notice Checks whether an address is the zero address.

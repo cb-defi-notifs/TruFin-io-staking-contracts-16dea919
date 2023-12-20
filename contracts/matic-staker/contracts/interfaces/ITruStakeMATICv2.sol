@@ -231,6 +231,9 @@ interface ITruStakeMATICv2 {
     /// @notice Error thrown when trying to perform actions on a non-existent validator.
     error ValidatorDoesNotExist();
 
+    /// @notice Error thrown when trying to privatise a validator that has assets remaining.
+    error ValidatorHasAssets();
+
     /// @notice Error thrown when trying to give private validator access to a user who already got it.
     error PrivateAccessAlreadyGiven();
 
