@@ -30,15 +30,42 @@ describe("UNHAPPY PATH", () => {
     await expect(whitelist.connect(user).addAgent(user.address))
       .to.be.revertedWithCustomError(whitelist, "CallerIsNotAnAgent");
 
-    await expect(await whitelist.isAgent(user.address)).equal(false);
-    await whitelist.connect(owner).addAgent(owner.address);
+    expect(await whitelist.isAgent(user.address)).equal(false);
+  });
+
+  it("addAgent should revert if adding an existing agent", async function () {
+    await expect(whitelist.connect(owner).addAgent(agent.address))
+      .to.be.revertedWithCustomError(whitelist, "UserAlreadyAnAgent");
+
+    expect(await whitelist.isAgent(agent.address)).equal(true);
+  });
+
+  it("addAgent should revert if adding owner", async function () {
+    await expect(whitelist.connect(agent).addAgent(owner.address))
+      .to.be.revertedWithCustomError(whitelist, "CannotAddOwner");
+
+    expect(await whitelist.isAgent(owner.address)).equal(true);
   });
 
   it("removeAgent should revert if not called by the agent", async function () {
     await expect(whitelist.connect(user).removeAgent(agent.address))
       .to.be.revertedWithCustomError(whitelist, "CallerIsNotAnAgent");
 
-    await expect(await whitelist.isAgent(agent.address)).equal(true);
+    expect(await whitelist.isAgent(agent.address)).equal(true);
+  });
+
+  it("removeAgent should revert if trying to remove owner", async function () {
+    await expect(whitelist.connect(agent).removeAgent(owner.address))
+      .to.be.revertedWithCustomError(whitelist, "CannotRemoveOwner");
+
+    expect(await whitelist.isAgent(owner.address)).equal(true);
+  });
+
+  it("removeAgent should revert if trying to remove non-agent", async function () {
+    await expect(whitelist.connect(agent).removeAgent(user.address))
+      .to.be.revertedWithCustomError(whitelist, "UserIsNotAnAgent");
+
+    expect(await whitelist.isAgent(user.address)).equal(false);
   });
 
   it("should revert if a non-agent is trying to whitelist a user", async function () {

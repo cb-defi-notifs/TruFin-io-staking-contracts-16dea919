@@ -42,6 +42,14 @@ contract MasterWhitelist is OwnableUpgradeable, IMasterWhitelist {
     /// @notice Adds an agent to the list of agents.
     /// @param _agent The address of the agent.
     function addAgent(address _agent) external onlyAgent {
+        if(_agent == owner()){
+            revert CannotAddOwner();
+        }
+
+        if(agents[_agent]){
+            revert UserAlreadyAnAgent();
+        }
+
         agents[_agent] = true;
 
         emit AgentAdded(_agent);
@@ -50,6 +58,14 @@ contract MasterWhitelist is OwnableUpgradeable, IMasterWhitelist {
     /// @notice Removes an agent from the list of agents.
     /// @param _agent The address of the agent.
     function removeAgent(address _agent) external onlyAgent {
+        if (_agent == owner()){
+            revert CannotRemoveOwner();
+        }
+
+        if (!agents[_agent]){
+            revert UserIsNotAnAgent();
+        }
+
         delete agents[_agent];
 
         emit AgentRemoved(_agent);
@@ -110,6 +126,6 @@ contract MasterWhitelist is OwnableUpgradeable, IMasterWhitelist {
     /// @dev The owner is always an agent.
     /// @return A value indicating whether this address is that of an agent.
     function isAgent(address _agent) public view returns (bool) {
-        return _agent == owner() || agents[_agent];
+        return agents[_agent] || _agent == owner();
     }
 }

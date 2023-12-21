@@ -18,7 +18,7 @@ describe("Checkpoint Submissions", () => {
 
     // add a new validator and deposit to it
     const newValidator = await smock.fake(constants.VALIDATOR_SHARE_ABI);
-    await staker.connect(deployer).addValidator(newValidator.address);
+    await staker.connect(deployer).addValidator(newValidator.address, false);
     await staker.connect(one).depositToSpecificValidator(parseEther(1000), newValidator.address);
 
     // store initial rewards value (should be zero)
@@ -55,7 +55,7 @@ describe("Checkpoint Submissions", () => {
     // add a new validator and deposit to it
     const newValidator = await smock.fake(constants.VALIDATOR_SHARE_ABI);
     newValidator.getLiquidRewards.returns(parseEther(100));
-    await staker.connect(deployer).addValidator(newValidator.address);
+    await staker.connect(deployer).addValidator(newValidator.address, false);
     await staker.connect(one).depositToSpecificValidator(parseEther(1000), newValidator.address);
 
     // submit as many times as there are saved checkpoints

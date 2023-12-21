@@ -22,6 +22,8 @@ import {IMasterWhitelist} from "../interfaces/IMasterWhitelist.sol";
 
 uint256 constant PHI_PRECISION = 1e4;
 uint256 constant MAX_EPSILON = 1e12;
+uint256 constant ONE_MATIC = 1e18;
+uint256 constant SHARE_PRICE_PRECISION = 1e22;
 
 /// @title TruStakeMATICv2
 /// @notice An auto-compounding liquid staking MATIC vault with reward-allocating functionality.
@@ -87,6 +89,7 @@ contract TruStakeMATICv2 is
         // Initialize contract state
         stakingTokenAddress = _stakingTokenAddress;
         stakeManagerContractAddress = _stakeManagerContractAddress;
+        defaultValidatorAddress = _validator;
         validatorAddresses.push(_validator);
         validators[_validator].state = ValidatorState.ENABLED;
         whitelistAddress = _whitelistAddress;
@@ -94,7 +97,7 @@ contract TruStakeMATICv2 is
         phi = _phi;
         distPhi = _distPhi;
         epsilon = 1e4;
-        minDeposit = 1e18; // default minimum is 1 MATIC
+        minDeposit = ONE_MATIC; // default minimum is 1 MATIC
 
         emit StakerInitialized(
             _stakingTokenAddress,
@@ -165,7 +168,7 @@ contract TruStakeMATICv2 is
     /// @notice Sets the lower deposit limit.
     /// @param _newMinDeposit New minimum amount of MATIC one has to deposit (default 1e18 = 1 MATIC).
     function setMinDeposit(uint256 _newMinDeposit) external onlyOwner {
-        if (_newMinDeposit < 1e18) revert MinDepositTooSmall();
+        if (_newMinDeposit < ONE_MATIC) revert MinDepositTooSmall();
 
         emit SetMinDeposit(minDeposit, _newMinDeposit);
         minDeposit = _newMinDeposit;
@@ -173,9 +176,10 @@ contract TruStakeMATICv2 is
 
     /// @notice Adds a new validator to the list of validators supported by the Staker.
     /// @param _validator The share contract address of the validator to add.
+    /// @param _isPrivate A boolean indicating whether access to the validator is limited to some users.
     /// @dev Newly added validators are considered enabled by default.
     /// @dev This function reverts when a validator with the same share contract address already exists.
-    function addValidator(address _validator) external onlyOwner {
+    function addValidator(address _validator, bool _isPrivate) external onlyOwner {
         _checkNotZeroAddress(_validator);
 
         if (validators[_validator].state != ValidatorState.NONE) revert ValidatorAlreadyExists();
@@ -185,8 +189,9 @@ contract TruStakeMATICv2 is
         (uint256 stakedAmount, ) = IValidatorShare(_validator).getTotalStake(address(this));
         validators[_validator].state = ValidatorState.ENABLED;
         validators[_validator].stakedAmount = stakedAmount;
+        validators[_validator].isPrivate = _isPrivate;
 
-        emit ValidatorAdded(_validator, stakedAmount);
+        emit ValidatorAdded(_validator, stakedAmount, _isPrivate);
     }
 
     /// @notice Disable an enabled validator to prevent depositing and staking to it.
@@ -211,6 +216,51 @@ contract TruStakeMATICv2 is
         validators[_validator].state = ValidatorState.ENABLED;
 
         emit ValidatorStateChanged(_validator, ValidatorState.DISABLED, ValidatorState.ENABLED);
+    }
+
+    /// @notice Gives a user private access to a validator.
+    /// @param _user The user address.
+    /// @param _validator The private validator address.
+    function givePrivateAccess(address _user, address _validator) external onlyOwner {
+        _checkNotZeroAddress(_user);
+        Validator memory validator = validators[_validator];
+        if (validator.state == ValidatorState.NONE) revert ValidatorDoesNotExist();
+        if (!validator.isPrivate) revert ValidatorNotPrivate();
+        if (usersPrivateAccess[_user] != address(0)) revert PrivateAccessAlreadyGiven();
+
+        usersPrivateAccess[_user] = _validator;
+
+        emit PrivateAccessGiven(_user, _validator);
+    }
+
+    /// @notice Removes private access to a private validator from a user.
+    /// @param _user The user address.
+    function removePrivateAccess(address _user) external onlyOwner {
+        address oldValidator = usersPrivateAccess[_user];
+        if (oldValidator == address(0)) revert PrivateAccessNotGiven();
+
+        delete usersPrivateAccess[_user];
+
+        emit PrivateAccessRemoved(_user, oldValidator);
+    }
+
+    /// @notice Changes the privacy status of a validator.
+    /// @param _validator The validator address.
+    /// @param _isPrivate Whether the validator should be private or not.
+    function changeValidatorPrivacy(address _validator, bool _isPrivate) external onlyOwner {
+        Validator storage validator = validators[_validator];
+        if (validator.state == ValidatorState.NONE) revert ValidatorDoesNotExist();
+
+        bool oldIsPrivate = validator.isPrivate;
+        if(oldIsPrivate && _isPrivate) revert ValidatorAlreadyPrivate();
+        if(!oldIsPrivate && !_isPrivate) revert ValidatorAlreadyNonPrivate();
+
+        // check assets are zero before privatising. Otherwise, assets on validator would be limited to private users.
+        if (!oldIsPrivate && validator.stakedAmount >= ONE_MATIC) revert ValidatorHasAssets();
+
+        validator.isPrivate = _isPrivate;
+
+        emit ValidatorPrivacyChanged(_validator, oldIsPrivate, _isPrivate);
     }
 
     /// @notice Claims a previously requested and now unbonded withdrawal.
@@ -239,25 +289,22 @@ contract TruStakeMATICv2 is
     /// stakes MATIC lingering in the vault to the validator provided.
     /// @dev Can be called manually to prevent the rewards surpassing reserves. This could lead to insufficient funds for
     /// withdrawals, as they are taken from delegated MATIC and not its rewards.
+    /// @dev This method should prevent staking the vault's assets on a private validator where they can't be withdrawn by non-private users.
     /// @param _validator Address of the validator where MATIC in the vault should be staked to.
     function compoundRewards(address _validator) external nonReentrant {
-        uint256 amountRestaked = totalRewards();
-        uint256 totalAssetBalance = totalAssets();
+        (uint256 globalPriceNum, uint256 globalPriceDenom) = sharePrice();
+        uint256 amountRestaked = _restake();
+
         // To keep share price constant when rewards are staked, new shares need to be minted
-        uint256 shareIncrease = convertToShares(totalStaked() + totalAssetBalance + amountRestaked) - totalSupply();
-
-        _restake();
-
-        // if there is MATIC in the vault, stake it with the provided validator
-        if (totalAssetBalance > 0) {
-            if (validators[_validator].state != ValidatorState.ENABLED) {
-                revert ValidatorNotEnabled();
-            }
-            _deposit(address(0), 0, _validator);
-        }
+        uint256 shareIncrease = (amountRestaked * phi * 1e18 * globalPriceDenom) / (globalPriceNum * PHI_PRECISION);
 
         // Minted shares are given to the treasury to effectively take a fee
         _mint(treasuryAddress, shareIncrease);
+
+        // if there is MATIC in the vault, stake it with the provided validator
+        if (totalAssets() > 0) {
+            _deposit(address(0), 0, _validator);
+        }
 
         emit RewardsCompounded(amountRestaked, shareIncrease);
     }
@@ -273,7 +320,7 @@ contract TruStakeMATICv2 is
         // can only allocate up to allocator's balance
         if (_amount > maxWithdraw(msg.sender)) revert InsufficientDistributorBalance();
 
-        if (_amount < 1e18) revert AllocationUnderOneMATIC();
+        if (_amount < ONE_MATIC) revert AllocationUnderOneMATIC();
 
         // variables up here for stack too deep issues
         uint256 individualAmount;
@@ -298,17 +345,17 @@ contract TruStakeMATICv2 is
                 // if this adds to an existing allocation, update the individual allocation
 
                 individualAmount = oldIndividualAllocationMaticAmount + _amount;
-                individualPriceNum = oldIndividualAllocationMaticAmount * 1e22 + _amount * 1e22;
+                individualPriceNum = oldIndividualAllocationMaticAmount * SHARE_PRICE_PRECISION + _amount * SHARE_PRICE_PRECISION;
 
                 individualPriceDenom =
                     MathUpgradeable.mulDiv(
-                        oldIndividualAllocationMaticAmount * 1e22,
+                        oldIndividualAllocationMaticAmount * SHARE_PRICE_PRECISION,
                         oldIndividualAllocation.sharePriceDenom,
                         oldIndividualAllocation.sharePriceNum,
                         MathUpgradeable.Rounding.Down
                     ) +
                     MathUpgradeable.mulDiv(
-                        _amount * 1e22,
+                        _amount * SHARE_PRICE_PRECISION,
                         globalPriceDenom,
                         globalPriceNum,
                         MathUpgradeable.Rounding.Down
@@ -343,7 +390,7 @@ contract TruStakeMATICv2 is
             individualMaticAmount -= _amount;
         }
 
-        if (individualMaticAmount < 1e18 && individualMaticAmount != 0) revert AllocationUnderOneMATIC();
+        if (individualMaticAmount < ONE_MATIC && individualMaticAmount != 0) revert AllocationUnderOneMATIC();
 
         // check if this is a complete deallocation
         if (individualMaticAmount == 0) {
@@ -367,9 +414,12 @@ contract TruStakeMATICv2 is
     /// @param _inMatic A value indicating whether the reward is in MATIC or not.
     /// @dev If _inMatic is set to true, the MATIC will be transferred straight from the distributor's wallet.
     /// Their TruMATIC balance will not be altered.
-    function distributeAll(bool _inMatic) external nonReentrant {
+    function distributeAll(bool _inMatic) external onlyWhitelist nonReentrant {
         address[] storage rec = recipients[msg.sender][false];
         uint256 recipientsCount = rec.length;
+
+        if (recipientsCount == 0) revert NoRecipientsFound();
+
         (uint256 globalPriceNum, uint256 globalPriceDenom) = sharePrice();
 
         for (uint256 i; i < recipientsCount; ) {
@@ -420,12 +470,28 @@ contract TruStakeMATICv2 is
         return withdrawalPresent && epochsPassed;
     }
 
+    /// @notice Returns whether a user can access a validator.
+    /// @dev A private validator can only be accessed by its users.
+    /// Users who are not mapped to a private validator can only access validators that are not private.
+    /// @param _user The user address.
+    /// @param _validator The validator address.
+    /// @return True if the user can access the validator, false otherwise.
+    function canAccessValidator(address _user, address _validator) external view returns (bool) {
+        _checkNotZeroAddress(_user);
+        _checkNotZeroAddress(_validator);
+        Validator memory validator = validators[_validator];
+        if (validator.state == ValidatorState.NONE) revert ValidatorDoesNotExist();
+
+        return _canAccessValidator(_user, _validator);
+    }
+
     // *** PUBLIC METHODS ***
     /// @notice Deposits an amount of caller->-vault approved MATIC into the vault.
     /// @param _assets The amount of MATIC to deposit.
     /// @dev The MATIC is staked with the default validator.
     /// @return The resulting amount of TruMATIC shares minted to the caller.
     function deposit(uint256 _assets) public onlyWhitelist nonReentrant returns (uint256) {
+        if (_assets < minDeposit) revert DepositBelowMinDeposit();
         return _deposit(msg.sender, _assets, defaultValidatorAddress);
     }
 
@@ -437,6 +503,7 @@ contract TruStakeMATICv2 is
         uint256 _assets,
         address _validator
     ) public onlyWhitelist nonReentrant returns (uint256) {
+        if (_assets < minDeposit) revert DepositBelowMinDeposit();
         return _deposit(msg.sender, _assets, _validator);
     }
 
@@ -458,7 +525,6 @@ contract TruStakeMATICv2 is
         address _validator
     ) public onlyWhitelist nonReentrant returns (uint256, uint256) {
         if (validators[_validator].state == ValidatorState.NONE) revert ValidatorDoesNotExist();
-
         return _withdrawRequest(msg.sender, _assets, _validator);
     }
 
@@ -467,7 +533,7 @@ contract TruStakeMATICv2 is
     /// @param _inMatic A value indicating whether the reward is in MATIC or not.
     /// @dev If _inMatic is set to true, the MATIC will be transferred straight from the distributor's wallet.
     /// Their TruMATIC balance will not be altered.
-    function distributeRewards(address _recipient, bool _inMatic) public nonReentrant {
+    function distributeRewards(address _recipient, bool _inMatic) public onlyWhitelist nonReentrant {
         (uint256 globalPriceNum, uint256 globalPriceDenom) = sharePrice();
         _distributeRewards(_recipient, msg.sender, _inMatic, globalPriceNum, globalPriceDenom);
     }
@@ -555,6 +621,32 @@ contract TruStakeMATICv2 is
         return validatorArray;
     }
 
+    /// @notice Retrieves information for the validators a user can access.
+    /// @param _user Address of the user.
+    /// @return An array of structs containing details for each validator a user can access.
+    function getUserValidators(address _user) public view returns (Validator[] memory) {
+
+        // find the validators the user has access to
+        Validator[] memory validators = getAllValidators();
+        Validator[] memory userValidatorsAll = new Validator[](validators.length);
+        uint256 userValidatorCount;
+        for (uint256 i; i < validators.length; i++) {
+            address validatorAddress = validators[i].validatorAddress;
+            if (_canAccessValidator(_user, validatorAddress)) {
+                userValidatorsAll[userValidatorCount] = validators[i];
+                userValidatorCount++;
+            }
+        }
+
+        // filter out zero items in userValidatorsAll
+        Validator[] memory userValidators = new Validator[](userValidatorCount);
+        for (uint256 i; i < userValidatorCount; i++) {
+            userValidators[i] = userValidatorsAll[i];
+        }
+
+        return userValidators;
+    }
+
     /// @notice Gets the total unclaimed MATIC rewards on a specific validator.
     /// @param _validator The address of the validator.
     /// @return Amount of MATIC rewards earned through this validator.
@@ -607,19 +699,19 @@ contract TruStakeMATICv2 is
 
             sharePriceDenom =
                 MathUpgradeable.mulDiv(
-                    totalAllocatedAmount * 1e22,
+                    totalAllocatedAmount * SHARE_PRICE_PRECISION,
                     sharePriceDenom,
                     sharePriceNum,
                     MathUpgradeable.Rounding.Up
                 ) +
                 MathUpgradeable.mulDiv(
-                    allocation.maticAmount * 1e22,
+                    allocation.maticAmount * SHARE_PRICE_PRECISION,
                     allocation.sharePriceDenom,
                     allocation.sharePriceNum,
                     MathUpgradeable.Rounding.Up
                 );
 
-            sharePriceNum = totalAllocatedAmount * 1e22 + allocation.maticAmount * 1e22;
+            sharePriceNum = totalAllocatedAmount * SHARE_PRICE_PRECISION + allocation.maticAmount * SHARE_PRICE_PRECISION;
             totalAllocatedAmount += allocation.maticAmount;
         }
         return Allocation(totalAllocatedAmount, sharePriceNum, sharePriceDenom);
@@ -674,15 +766,14 @@ contract TruStakeMATICv2 is
     /// @param _amount Amount to be deposited.
     /// @param _validator Address of the validator to stake to.
     function _deposit(address _user, uint256 _amount, address _validator) private returns (uint256) {
-        if (_amount < minDeposit && _amount > 0) revert DepositBelowMinDeposit();
-
+        if (!_canAccessValidator(_user, _validator)) revert ValidatorAccessDenied();
         if (validators[_validator].state != ValidatorState.ENABLED) revert ValidatorNotEnabled();
 
         (uint256 globalPriceNum, uint256 globalPriceDenom) = sharePrice();
 
         // calculate share increase
         uint256 shareIncreaseUser = convertToShares(_amount);
-        uint256 shareIncreaseTsy = (totalRewards() * phi * 1e18 * globalPriceDenom) / (globalPriceNum * PHI_PRECISION);
+        uint256 shareIncreaseTsy = (getRewardsFromValidator(_validator) * phi * 1e18 * globalPriceDenom) / (globalPriceNum * PHI_PRECISION);
 
         // piggyback previous withdrawn rewards in this staking call
         uint256 totalAssetBalance = totalAssets();
@@ -713,6 +804,7 @@ contract TruStakeMATICv2 is
     /// @param _amount The amount to be withdrawn.
     /// @param _validator Address of the validator to withdraw from.
     function _withdrawRequest(address _user, uint256 _amount, address _validator) private returns (uint256, uint256) {
+        if (!_canAccessValidator(_user, _validator)) revert ValidatorAccessDenied();
         if (_amount == 0) revert WithdrawalRequestAmountCannotEqualZero();
 
         uint256 maxWithdrawal = maxWithdraw(_user);
@@ -723,11 +815,11 @@ contract TruStakeMATICv2 is
         // calculate share decrease
         uint256 shareDecreaseUser = (_amount * globalPriceDenom * 1e18) / globalPriceNum;
 
-        uint256 shareIncreaseTsy = (totalRewards() * phi * globalPriceDenom * 1e18) / (globalPriceNum * PHI_PRECISION);
+        uint256 shareIncreaseTsy = (getRewardsFromValidator(_validator) * phi * globalPriceDenom * 1e18) / (globalPriceNum * PHI_PRECISION);
 
         // If remaining user balance is below 1 MATIC, entire balance is withdrawn and all shares
         // are burnt. We allow the user to withdraw their deposited amount + epsilon
-        if (maxWithdrawal - _amount < 1e18) {
+        if (maxWithdrawal - _amount < ONE_MATIC) {
             _amount = maxWithdrawal;
             shareDecreaseUser = balanceOf(_user);
         }
@@ -780,23 +872,23 @@ contract TruStakeMATICv2 is
         if (withdrawal.user != msg.sender) revert SenderMustHaveInitiatedWithdrawalRequest();
 
         // claim will revert if unbonding not finished for this unbond nonce
-        _claimStake(_unbondNonce, _validator);
+        uint256 receivedAmount = _claimStake(_unbondNonce, _validator);
 
         // transfer claimed MATIC to claimer
-        IERC20Upgradeable(stakingTokenAddress).safeTransfer(msg.sender, withdrawal.amount);
+        IERC20Upgradeable(stakingTokenAddress).safeTransfer(msg.sender, receivedAmount);
 
-        emit WithdrawalClaimed(msg.sender, _validator, _unbondNonce, withdrawal.amount);
+        emit WithdrawalClaimed(msg.sender, _validator, _unbondNonce, withdrawal.amount, receivedAmount);
     }
 
     /// @notice Validator function that transfers the _amount to the stake manager and stakes the assets onto the validator.
     /// @param _amount Amount of MATIC to stake.
     /// @param _validator Address of the validator to stake with.
     function _stake(uint256 _amount, address _validator) private {
-        validators[_validator].stakedAmount += _amount;
-        IValidatorShare(_validator).buyVoucher(_amount, _amount);
+        uint256 amountToDeposit = IValidatorShare(_validator).buyVoucher(_amount, _amount);
+        validators[_validator].stakedAmount += amountToDeposit;
     }
 
-    /// @notice Requests to unstake a certain amount of MATIC from the default validator.
+    /// @notice Requests to unstake a certain amount of MATIC from the specified validator.
     /// @param _amount Amount of MATIC to initiate the unstaking of.
     /// @param _validator Address of the validator to unstake from.
     function _unbond(uint256 _amount, address _validator) private returns (uint256) {
@@ -808,21 +900,26 @@ contract TruStakeMATICv2 is
     /// @notice Internal function for claiming the MATIC from a withdrawal request made previously.
     /// @param _unbondNonce Unbond nonce of the withdrawal request being claimed.
     /// @param _validator Address of the validator to claim from.
-    function _claimStake(uint256 _unbondNonce, address _validator) private {
+    /// @return The amount of MATIC received by the vault from the validator.
+    function _claimStake(uint256 _unbondNonce, address _validator) private returns (uint256) {
+        uint256 assetsBefore = totalAssets();
         IValidatorShare(_validator).unstakeClaimTokens_new(_unbondNonce);
+        return totalAssets() - assetsBefore;
     }
 
     /// @notice Calls the validator share contract's restake functionality on all enabled validators
     /// to turn earned rewards into staked MATIC.
     /// @dev Logs a RestakeError event when an exception occurs while calling restake on a validator.
-    function _restake() private {
+    function _restake() private returns (uint256) {
         uint256 validatorCount = validatorAddresses.length;
+        uint256 totalAmountRestaked;
         for (uint256 i; i < validatorCount; ) {
             address validator = validatorAddresses[i];
             if (validators[validator].state == ValidatorState.ENABLED) {
                 // log an event on "Too small rewards to restake" and other exceptions
-                try IValidatorShare(validator).restake() returns (uint256 amountRestaked, uint256) {
+                try IValidatorShare(validator).restake() returns (uint256 amountRestaked, uint256 liquidRewards) {
                     validators[validator].stakedAmount += amountRestaked;
+                    totalAmountRestaked += liquidRewards;
                 } catch Error(string memory reason) {
                     emit RestakeError(validator, reason);
                 }
@@ -832,6 +929,7 @@ contract TruStakeMATICv2 is
                 ++i;
             }
         }
+        return totalAmountRestaked;
     }
 
     /// @notice Distributes the rewards related to the allocation made to that receiver.
@@ -874,7 +972,7 @@ contract TruStakeMATICv2 is
         }
 
         if (_inMatic) {
-            uint256 maticAmount = previewRedeem(sharesToMove);
+            uint256 maticAmount = convertToAssets(sharesToMove);
             // transfer staking token from distributor to recipient
             IERC20Upgradeable(stakingTokenAddress).safeTransferFrom(_distributor, _recipient, maticAmount);
         } else {
@@ -926,6 +1024,22 @@ contract TruStakeMATICv2 is
     function _convertToAssets(uint256 shares, MathUpgradeable.Rounding rounding) private view returns (uint256) {
         (uint256 globalPriceNum, uint256 globalPriceDenom) = sharePrice();
         return MathUpgradeable.mulDiv(shares, globalPriceNum, globalPriceDenom * 1e18, rounding);
+    }
+
+    /// @notice Returns whether a user can access a validator.
+    /// @param _user The user address.
+    /// @param _validator The validator address.
+    /// @return True if the user can access the validator, false otherwise.
+    function _canAccessValidator(address _user, address _validator) private view returns (bool) {
+        address privateValidator = usersPrivateAccess[_user];
+
+        if (validators[privateValidator].isPrivate == true) {
+             // if the user is limited to a private validator, only that validator is accessible
+             return privateValidator == _validator;
+        }
+
+        // otherwise, non-private validators are accessible, private validators are not
+        return !validators[_validator].isPrivate;
     }
 
     /// @notice Checks whether an address is the zero address.

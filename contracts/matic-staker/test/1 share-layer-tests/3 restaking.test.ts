@@ -15,6 +15,7 @@ import {
   setTokenBalance,
   submitCheckpoint
 } from "../helpers/state-interaction";
+import { smock } from '@defi-wonderland/smock';
 
 describe("RESTAKE", () => {
   let deployer, treasury, one, token, stakeManager, validatorShare, validatorShare2, staker;
@@ -67,7 +68,7 @@ describe("RESTAKE", () => {
       let totalStaked = await staker.totalStaked();
       let totalShares = await staker.totalSupply();
       let totalRewards = await staker.totalRewards();
-      let phiPrecision = BigNumber.from(10000);
+      let phiPrecision = constants.PHI_PRECISION;
       let phi = constants.PHI;
 
       // calculate expected new share price as in Staker.sol
@@ -111,10 +112,7 @@ describe("RESTAKE", () => {
       expect(await staker.totalSupply()).to.equal(totalShares.add(shareInc));
       expect(await staker.totalAssets()).to.equal(parseEther(0)); // not changed
       expect(await staker.totalRewards()).to.equal(parseEther(0)); // changed
-      expect(divSharePrice(await staker.sharePrice())).to.equal(
-        divSharePrice(expSharePrice)
-      ); // not changed (most important)
-
+      expect(divSharePrice(await staker.sharePrice())).to.equal(divSharePrice(expSharePrice)); // should not have changed
       // check user values are as expected
       // one
       expect(await staker.balanceOf(one.address)).to.equal(parseEther(10e6)); // should not have changed
@@ -158,9 +156,132 @@ describe("RESTAKE", () => {
       );
     });
 
+    it("After slashing, treasury is minted fees for all rewards", async () => {
+      // deposit some MATIC
+      let depositAmt = parseEther(5e6);
+      await staker
+        .connect(one)
+        .deposit(depositAmt);
+
+      // mock validator
+      const newValidator = await smock.fake(constants.VALIDATOR_SHARE_ABI);
+      await staker.addValidator(newValidator.address, false);
+      // new validator returns deposited amount as totalStaked amount
+      newValidator.buyVoucher.returns(depositAmt);
+
+      // deposit some MATIC into the new validator
+      await staker.connect(one).depositToSpecificValidator(depositAmt, newValidator.address);
+
+      // new staker returns different amounts for amountStaked and liquidRewards
+       newValidator.restake.returns([parseEther(10), parseEther(11)]);
+
+      // increase rewards
+      await submitCheckpoint(0);
+
+      let treasuryBalanceBefore = await staker.balanceOf(treasury.address);
+      let defaultValidatorRewards = await staker.getRewardsFromValidator(validatorShare.address);
+      let sharePricePreCompound = await staker.sharePrice();
+
+      // calculate the expected shares minted for restaking
+      const sharesMintedForRestake = (defaultValidatorRewards.add(parseEther(11))).mul(constants.PHI).mul(parseEther(1)).mul(sharePricePreCompound[1]).div((sharePricePreCompound[0].mul(constants.PHI_PRECISION)));
+
+      // stake claimed rewards - no additional shares should be minted for depositing claimed rewards
+      await staker.connect(deployer).compoundRewards(validatorShare.address);
+
+      // ensure treasury was transferred correct amount of shares
+      expect((await staker.balanceOf(treasury.address)).sub(treasuryBalanceBefore)).to.equal(sharesMintedForRestake);
+    });
+
+    it("if validator restake fails, treasury fees on deposit are computed with correct sharePrice", async () => {
+      // mock validator
+      const newValidator = await smock.fake(constants.VALIDATOR_SHARE_ABI);
+
+      // new validator always returns 1 MATIC as rewards to mimic a failed restake
+      newValidator.getLiquidRewards.returns(parseEther(1));
+
+      // new validator returns deposited amount as totalStaked amount
+      let depositAmt = parseEther(5e6);
+      newValidator.buyVoucher.returns(depositAmt);
+
+      // add the new validator
+      await staker.addValidator(newValidator.address, false);
+
+      // deposit some MATIC into the default and new validator
+      await staker.connect(one).deposit(depositAmt);
+      await staker.connect(one).depositToSpecificValidator(depositAmt, newValidator.address);
+
+      // set `claimedRewards` / MATIC balance to 1 MATIC
+      await setTokenBalance(token, staker.address, parseEther(1));
+
+      // accrue rewards
+      await submitCheckpoint(0);
+
+      let treasuryBalanceBefore = await staker.balanceOf(treasury.address);
+      let defaultValidatorRewards = await staker.getRewardsFromValidator(validatorShare.address);
+      let newValidatorRewards = await staker.getRewardsFromValidator(newValidator.address);
+      let claimedRewards = await staker.totalAssets();
+      let preSupply = await staker.totalSupply();
+      let [globalPriceNum, globalPriceDenom] = await staker.sharePrice();
+
+      // calculate the expected shares minted for restaking
+      const sharesMintedForRestake = defaultValidatorRewards.mul(constants.PHI).mul(parseEther(1)).mul(globalPriceDenom).div((globalPriceNum.mul(constants.PHI_PRECISION)));
+
+      // stake claimed rewards
+      await staker.connect(deployer).compoundRewards(newValidator.address);
+
+      // calculate the expected share price after restaking but before depositing claimed rewards
+      let totalStakedMidCompound = (depositAmt.mul(2).add(defaultValidatorRewards))
+      globalPriceNum = totalStakedMidCompound.add(claimedRewards).mul(constants.PHI_PRECISION).add((constants.PHI_PRECISION.sub(constants.PHI)).mul(newValidatorRewards)).mul(parseEther(1));
+      globalPriceDenom = (preSupply.add(sharesMintedForRestake)).mul(constants.PHI_PRECISION);
+
+      // calculate expected shares minted for depositing claimed rewards
+      const sharesMintedForDeposit = newValidatorRewards.mul(constants.PHI).mul(parseEther(1)).mul(globalPriceDenom).div((globalPriceNum.mul(constants.PHI_PRECISION)));
+
+      // ensure treasury was transferred correct amount of shares
+      expect((await staker.balanceOf(treasury.address)).sub(treasuryBalanceBefore)).to.equal(sharesMintedForDeposit.add(sharesMintedForRestake));
+    });
+
+    it("if validator restake fails, treasury is only minted shares for restaked amount", async () => {
+      // mock validator
+      const newValidator = await smock.fake(constants.VALIDATOR_SHARE_ABI);
+
+      // new validator always returns 1 MATIC as rewards to mimic a failed restake
+      newValidator.getLiquidRewards.returns(parseEther(1));
+
+      // new validator returns deposited amount as the newly staked amount
+      let depositAmt = parseEther(5e6);
+      newValidator.buyVoucher.returns(depositAmt);
+
+      // add the new validator
+      await staker.addValidator(newValidator.address, false);
+
+      // deposit some MATIC into the default and new validator
+      await staker.connect(one).deposit(depositAmt);
+      await staker.connect(one).depositToSpecificValidator(depositAmt, newValidator.address);
+
+      // set `claimedRewards` / MATIC balance to 1 MATIC
+      await setTokenBalance(token, staker.address, parseEther(1));
+
+      // accrue rewards
+      await submitCheckpoint(0);
+
+      let treasuryBalanceBefore = await staker.balanceOf(treasury.address);
+      let defaultValidatorRewards = await staker.getRewardsFromValidator(validatorShare.address);
+      let [globalPriceNum, globalPriceDenom] = await staker.sharePrice();
+
+      // calculate the expected shares minted for restaking
+      const sharesMintedForRestake = defaultValidatorRewards.mul(constants.PHI).mul(parseEther(1)).mul(globalPriceDenom).div((globalPriceNum.mul(constants.PHI_PRECISION)));
+
+      // stake claimed rewards - no additional shares should be minted for depositing claimed rewards
+      await staker.connect(deployer).compoundRewards(validatorShare.address);
+
+      // ensure treasury was transferred correct amount of shares
+      expect((await staker.balanceOf(treasury.address)).sub(treasuryBalanceBefore)).to.equal(sharesMintedForRestake);
+    });
+
     it("compoundRewards correctly updates staked amount", async () => {
        // add a new validator
-       await staker.addValidator(validatorShare2.address);
+       await staker.addValidator(validatorShare2.address, false);
 
       // deposit some MATIC into the default and new validator
       let depositAmt = parseEther(5e6);
@@ -214,7 +335,7 @@ describe("RESTAKE", () => {
 
     it("stakes MATIC present in the vault with the selected validator", async () => {
       // add a new validator
-      await staker.addValidator(validatorShare2.address);
+      await staker.addValidator(validatorShare2.address, false);
 
       // set some MATIC in the vault
       const maticAmount = parseEther(1000);
@@ -234,7 +355,7 @@ describe("RESTAKE", () => {
 
     it("reverts when the selected validator is disabled", async () => {
       // add a new validator
-      await staker.addValidator(validatorShare2.address);
+      await staker.addValidator(validatorShare2.address, false);
       await staker.disableValidator(validatorShare2.address);
 
       // set some MATIC in the vault
@@ -295,7 +416,7 @@ describe("RESTAKE", () => {
 
     it("restakes liquid rewards on multiple validators", async () => {
       // add a second validator
-      await staker.addValidator(validatorShare2.address);
+      await staker.addValidator(validatorShare2.address, false);
 
       // stake on both validators
       await staker.connect(one).depositToSpecificValidator(parseEther(1e6), validatorShare.address);
@@ -326,6 +447,19 @@ describe("RESTAKE", () => {
 
       expect(stakeOnFirstValidator).to.equal(stakeOnFirstValidatorAfterDeposit.add(rewardsOnFirstValidator))
       expect(stakeOnSecondValidator).to.equal(stakeOnSecondValidatorAfterDeposit.add(rewardsOnSecondValidator))
+    });
+
+    it("reverts when staking vault's assets on a private validator", async () => {
+      // add a private validator
+      await staker.addValidator(validatorShare2.address, true);
+
+      // set some MATIC in the vault
+      const maticAmount = parseEther(1000);
+      await setTokenBalance(token, staker.address, maticAmount);
+
+      // calling compoundRewards with the private validator should revert
+      await expect(staker.connect(deployer).compoundRewards(validatorShare2.address))
+        .to.be.revertedWithCustomError(staker, "ValidatorAccessDenied");
     });
   });
 });
