@@ -778,13 +778,14 @@ contract TruStakeMATICv2 is
         // piggyback previous withdrawn rewards in this staking call
         uint256 totalAssetBalance = totalAssets();
         uint256 stakeAmount = _amount + totalAssetBalance;
-        // adjust share balances
-        if (_user != address(0)) _mint(_user, shareIncreaseUser);
 
         _mint(treasuryAddress, shareIncreaseTsy);
 
-        // transfer staking token from user to Staker
-        IERC20Upgradeable(stakingTokenAddress).safeTransferFrom(_user, address(this), _amount);
+        // mint shares to user and transfer staking token from user to Staker
+        if (_user != address(0)) {
+            _mint(_user, shareIncreaseUser);
+            IERC20Upgradeable(stakingTokenAddress).safeTransferFrom(_user, address(this), _amount);
+        }
 
         // approve funds to Stake Manager
         IERC20Upgradeable(stakingTokenAddress).safeIncreaseAllowance(stakeManagerContractAddress, stakeAmount);
@@ -858,7 +859,7 @@ contract TruStakeMATICv2 is
         if (withdrawal.user != address(0)) {
             delete withdrawals[_validator][_unbondNonce];
         } else if (
-            _validator == 0xeA077b10A0eD33e4F68Edb2655C18FDA38F84712 &&
+            _validator == 0x75605B4F7C52e37b4f37121DC4529b08dFC76b39 &&
             unbondingWithdrawals[_unbondNonce].user != address(0)
         ) {
             // else if the claim is for the twinstake staker, check the legacy mapping for the withdrawal
