@@ -1,6 +1,7 @@
 {
     "rules": {
       "no-unused-vars": "error",
+      "no-unused-import": "error",
       "const-name-snakecase": "error",
       "contract-name-camelcase": "error",
       "event-name-camelcase": "error",
@@ -16,6 +17,7 @@
       "quotes": ["error","double"],
       "named-parameters-mapping": "off",
       "ordering": "warn",
-      "visibility-modifier-order": "warn"
+      "visibility-modifier-order": "warn",
+      "explicit-types": ["warn","explicit"]
     }
   }

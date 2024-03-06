@@ -8,6 +8,7 @@ import {MathUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/math/Ma
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import {SafeERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
+import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 
 // Polygon
 import {IValidatorShare} from "../interfaces/IValidatorShare.sol";
@@ -32,7 +33,8 @@ contract TruStakeMATICv2 is
     ITruStakeMATICv2,
     OwnableUpgradeable,
     ReentrancyGuardUpgradeable,
-    ERC4626Storage
+    ERC4626Storage,
+    PausableUpgradeable
 {
     // *** LIBRARIES ***
 
@@ -74,6 +76,7 @@ contract TruStakeMATICv2 is
         __ReentrancyGuard_init();
         __Ownable_init();
         __ERC20_init("TruStake MATIC Vault Shares", "TruMATIC");
+        __Pausable_init();
 
         // Ensure addresses are non-zero
         _checkNotZeroAddress(_stakingTokenAddress);
@@ -111,6 +114,17 @@ contract TruStakeMATICv2 is
     }
 
     /// *** EXTERNAL METHODS ***
+    // *** VAULT OWNER ADMIN ACTIONS ***
+    /// @notice Allows owner to pause the contract. Requires the contract to be unpaused.
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    /// @notice Allows owner to unpause the contract. Requires the contract to be paused.
+    function unpause() external onlyOwner {
+        _unpause();
+    }
+
     // *** VAULT OWNER ADMIN SETTERS ***
     /// @notice Sets the whitelist used to check user status.
     /// @param _whitelistAddress to point to.
@@ -252,8 +266,8 @@ contract TruStakeMATICv2 is
         if (validator.state == ValidatorState.NONE) revert ValidatorDoesNotExist();
 
         bool oldIsPrivate = validator.isPrivate;
-        if(oldIsPrivate && _isPrivate) revert ValidatorAlreadyPrivate();
-        if(!oldIsPrivate && !_isPrivate) revert ValidatorAlreadyNonPrivate();
+        if (oldIsPrivate && _isPrivate) revert ValidatorAlreadyPrivate();
+        if (!oldIsPrivate && !_isPrivate) revert ValidatorAlreadyNonPrivate();
 
         // check assets are zero before privatising. Otherwise, assets on validator would be limited to private users.
         if (!oldIsPrivate && validator.stakedAmount >= ONE_MATIC) revert ValidatorHasAssets();
@@ -266,14 +280,17 @@ contract TruStakeMATICv2 is
     /// @notice Claims a previously requested and now unbonded withdrawal.
     /// @param _unbondNonce Nonce of the corresponding delegator unbond.
     /// @param _validator Address of the validator to claim the withdrawal from.
-    function withdrawClaim(uint256 _unbondNonce, address _validator) external onlyWhitelist nonReentrant {
+    function withdrawClaim(uint256 _unbondNonce, address _validator) external onlyWhitelist nonReentrant whenNotPaused {
         _withdrawClaim(_unbondNonce, _validator);
     }
 
     /// @notice Claims multiple previously requested and now unbonded withdrawals from a specified validator.
     /// @param _unbondNonces List of delegator unbond nonces corresponding to said withdrawals.
     /// @param _validator Address of the validator to claim the withdrawals from.
-    function claimList(uint256[] calldata _unbondNonces, address _validator) external onlyWhitelist nonReentrant {
+    function claimList(
+        uint256[] calldata _unbondNonces,
+        address _validator
+    ) external onlyWhitelist nonReentrant whenNotPaused {
         uint256 len = _unbondNonces.length;
 
         for (uint256 i; i < len; ) {
@@ -291,7 +308,7 @@ contract TruStakeMATICv2 is
     /// withdrawals, as they are taken from delegated MATIC and not its rewards.
     /// @dev This method should prevent staking the vault's assets on a private validator where they can't be withdrawn by non-private users.
     /// @param _validator Address of the validator where MATIC in the vault should be staked to.
-    function compoundRewards(address _validator) external nonReentrant {
+    function compoundRewards(address _validator) external nonReentrant whenNotPaused {
         (uint256 globalPriceNum, uint256 globalPriceDenom) = sharePrice();
         uint256 amountRestaked = _restake();
 
@@ -314,7 +331,7 @@ contract TruStakeMATICv2 is
     /// @notice Allocates the validation rewards earned by an amount of the caller's staked MATIC to a user.
     /// @param _amount The amount of staked MATIC to allocate.
     /// @param _recipient The address of the target recipient.
-    function allocate(uint256 _amount, address _recipient) external onlyWhitelist nonReentrant {
+    function allocate(uint256 _amount, address _recipient) external onlyWhitelist nonReentrant whenNotPaused {
         _checkNotZeroAddress(_recipient);
 
         // can only allocate up to allocator's balance
@@ -345,7 +362,11 @@ contract TruStakeMATICv2 is
                 // if this adds to an existing allocation, update the individual allocation
 
                 individualAmount = oldIndividualAllocationMaticAmount + _amount;
-                individualPriceNum = oldIndividualAllocationMaticAmount * SHARE_PRICE_PRECISION + _amount * SHARE_PRICE_PRECISION;
+                individualPriceNum =
+                    oldIndividualAllocationMaticAmount *
+                    SHARE_PRICE_PRECISION +
+                    _amount *
+                    SHARE_PRICE_PRECISION;
 
                 individualPriceDenom =
                     MathUpgradeable.mulDiv(
@@ -377,7 +398,7 @@ contract TruStakeMATICv2 is
     /// @notice Deallocates an amount of MATIC previously allocated to a user.
     /// @param _amount The amount the caller wishes to reduce the target's allocation by.
     /// @param _recipient The address of the user whose allocation is being reduced.
-    function deallocate(uint256 _amount, address _recipient) external onlyWhitelist nonReentrant {
+    function deallocate(uint256 _amount, address _recipient) external onlyWhitelist nonReentrant whenNotPaused {
         Allocation storage individualAllocation = allocations[msg.sender][_recipient][false];
 
         uint256 individualMaticAmount = individualAllocation.maticAmount;
@@ -414,7 +435,7 @@ contract TruStakeMATICv2 is
     /// @param _inMatic A value indicating whether the reward is in MATIC or not.
     /// @dev If _inMatic is set to true, the MATIC will be transferred straight from the distributor's wallet.
     /// Their TruMATIC balance will not be altered.
-    function distributeAll(bool _inMatic) external onlyWhitelist nonReentrant {
+    function distributeAll(bool _inMatic) external onlyWhitelist nonReentrant whenNotPaused {
         address[] storage rec = recipients[msg.sender][false];
         uint256 recipientsCount = rec.length;
 
@@ -490,7 +511,7 @@ contract TruStakeMATICv2 is
     /// @param _assets The amount of MATIC to deposit.
     /// @dev The MATIC is staked with the default validator.
     /// @return The resulting amount of TruMATIC shares minted to the caller.
-    function deposit(uint256 _assets) public onlyWhitelist nonReentrant returns (uint256) {
+    function deposit(uint256 _assets) public onlyWhitelist nonReentrant whenNotPaused returns (uint256) {
         if (_assets < minDeposit) revert DepositBelowMinDeposit();
         return _deposit(msg.sender, _assets, defaultValidatorAddress);
     }
@@ -502,7 +523,7 @@ contract TruStakeMATICv2 is
     function depositToSpecificValidator(
         uint256 _assets,
         address _validator
-    ) public onlyWhitelist nonReentrant returns (uint256) {
+    ) public onlyWhitelist nonReentrant whenNotPaused returns (uint256) {
         if (_assets < minDeposit) revert DepositBelowMinDeposit();
         return _deposit(msg.sender, _assets, _validator);
     }
@@ -511,7 +532,7 @@ contract TruStakeMATICv2 is
     /// @param _assets The amount of MATIC to withdraw.
     /// @dev The MATIC is unstaked from the default validator.
     /// @return The resulting amount of TruMATIC shares burned from the caller and the unbond nonce.
-    function withdraw(uint256 _assets) public onlyWhitelist nonReentrant returns (uint256, uint256) {
+    function withdraw(uint256 _assets) public onlyWhitelist nonReentrant whenNotPaused returns (uint256, uint256) {
         return _withdrawRequest(msg.sender, _assets, defaultValidatorAddress);
     }
 
@@ -523,7 +544,7 @@ contract TruStakeMATICv2 is
     function withdrawFromSpecificValidator(
         uint256 _assets,
         address _validator
-    ) public onlyWhitelist nonReentrant returns (uint256, uint256) {
+    ) public onlyWhitelist nonReentrant whenNotPaused returns (uint256, uint256) {
         if (validators[_validator].state == ValidatorState.NONE) revert ValidatorDoesNotExist();
         return _withdrawRequest(msg.sender, _assets, _validator);
     }
@@ -533,7 +554,7 @@ contract TruStakeMATICv2 is
     /// @param _inMatic A value indicating whether the reward is in MATIC or not.
     /// @dev If _inMatic is set to true, the MATIC will be transferred straight from the distributor's wallet.
     /// Their TruMATIC balance will not be altered.
-    function distributeRewards(address _recipient, bool _inMatic) public onlyWhitelist nonReentrant {
+    function distributeRewards(address _recipient, bool _inMatic) public onlyWhitelist nonReentrant whenNotPaused {
         (uint256 globalPriceNum, uint256 globalPriceDenom) = sharePrice();
         _distributeRewards(_recipient, msg.sender, _inMatic, globalPriceNum, globalPriceDenom);
     }
@@ -625,7 +646,6 @@ contract TruStakeMATICv2 is
     /// @param _user Address of the user.
     /// @return An array of structs containing details for each validator a user can access.
     function getUserValidators(address _user) public view returns (Validator[] memory) {
-
         // find the validators the user has access to
         Validator[] memory validators = getAllValidators();
         Validator[] memory userValidatorsAll = new Validator[](validators.length);
@@ -711,7 +731,11 @@ contract TruStakeMATICv2 is
                     MathUpgradeable.Rounding.Up
                 );
 
-            sharePriceNum = totalAllocatedAmount * SHARE_PRICE_PRECISION + allocation.maticAmount * SHARE_PRICE_PRECISION;
+            sharePriceNum =
+                totalAllocatedAmount *
+                SHARE_PRICE_PRECISION +
+                allocation.maticAmount *
+                SHARE_PRICE_PRECISION;
             totalAllocatedAmount += allocation.maticAmount;
         }
         return Allocation(totalAllocatedAmount, sharePriceNum, sharePriceDenom);
@@ -773,7 +797,8 @@ contract TruStakeMATICv2 is
 
         // calculate share increase
         uint256 shareIncreaseUser = convertToShares(_amount);
-        uint256 shareIncreaseTsy = (getRewardsFromValidator(_validator) * phi * 1e18 * globalPriceDenom) / (globalPriceNum * PHI_PRECISION);
+        uint256 shareIncreaseTsy = (getRewardsFromValidator(_validator) * phi * 1e18 * globalPriceDenom) /
+            (globalPriceNum * PHI_PRECISION);
 
         // piggyback previous withdrawn rewards in this staking call
         uint256 totalAssetBalance = totalAssets();
@@ -816,7 +841,8 @@ contract TruStakeMATICv2 is
         // calculate share decrease
         uint256 shareDecreaseUser = (_amount * globalPriceDenom * 1e18) / globalPriceNum;
 
-        uint256 shareIncreaseTsy = (getRewardsFromValidator(_validator) * phi * globalPriceDenom * 1e18) / (globalPriceNum * PHI_PRECISION);
+        uint256 shareIncreaseTsy = (getRewardsFromValidator(_validator) * phi * globalPriceDenom * 1e18) /
+            (globalPriceNum * PHI_PRECISION);
 
         // If remaining user balance is below 1 MATIC, entire balance is withdrawn and all shares
         // are burnt. We allow the user to withdraw their deposited amount + epsilon
@@ -859,7 +885,7 @@ contract TruStakeMATICv2 is
         if (withdrawal.user != address(0)) {
             delete withdrawals[_validator][_unbondNonce];
         } else if (
-            _validator == 0x75605B4F7C52e37b4f37121DC4529b08dFC76b39 &&
+            _validator == 0xeA077b10A0eD33e4F68Edb2655C18FDA38F84712 &&
             unbondingWithdrawals[_unbondNonce].user != address(0)
         ) {
             // else if the claim is for the twinstake staker, check the legacy mapping for the withdrawal
@@ -937,7 +963,13 @@ contract TruStakeMATICv2 is
     /// @param _recipient Receives the rewards.
     /// @param _distributor Distributes their rewards.
     /// @param _inMatic A value indicating whether rewards are in MATIC.
-    function _distributeRewards(address _recipient, address _distributor, bool _inMatic, uint256 globalPriceNum, uint256 globalPriceDenom) private {
+    function _distributeRewards(
+        address _recipient,
+        address _distributor,
+        bool _inMatic,
+        uint256 globalPriceNum,
+        uint256 globalPriceDenom
+    ) private {
         Allocation storage individualAllocation = allocations[_distributor][_recipient][false];
         uint256 amt = individualAllocation.maticAmount;
 
@@ -1035,8 +1067,8 @@ contract TruStakeMATICv2 is
         address privateValidator = usersPrivateAccess[_user];
 
         if (validators[privateValidator].isPrivate == true) {
-             // if the user is limited to a private validator, only that validator is accessible
-             return privateValidator == _validator;
+            // if the user is limited to a private validator, only that validator is accessible
+            return privateValidator == _validator;
         }
 
         // otherwise, non-private validators are accessible, private validators are not

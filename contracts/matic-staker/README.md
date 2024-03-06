@@ -24,10 +24,10 @@ To get a report on gas usage, run `npm run check-gas`.
 
 
 1. Deploy:  
-`npx hardhat run scripts/deploy/deploy-staker.ts --network <goerli or mainnet>`
+`npx hardhat run scripts/deploy-staker.ts --network <goerli, sepolia or mainnet>`
 
-2. Verify:  
-`npx hardhat verify <new staker implementation address> --network <goerli or mainnet>`
+1. Verify:  
+`npx hardhat verify <new staker implementation address> --network <goerli, sepolia or mainnet>`
 
 Note: If deploying for mainnet, don't forget to change the proxy admin to be controlled by a multisig.
 
@@ -39,10 +39,20 @@ To upgrade for testnet, deploy the implementation and update the proxy in one go
 Run the following commands:
 
 1. Deploy:  
-`CONTRACT=<the proxy contract address> npx hardhat run scripts/deploy/upgrade-staker.ts --network goerli`
-2. Verify:  
+`CONTRACT=<the proxy contract address> npx hardhat run scripts/upgrade-staker.ts --network goerli`
+1. Verify:  
 `npx hardhat verify <new staker implementation address> --network goerli`
 
+#### Upgrading Testnet (Sepolia)
+
+To upgrade for testnet, deploy the implementation and update the proxy in one go.
+
+Run the following commands:
+
+1. Deploy:  
+`CONTRACT=<the proxy contract address> npx hardhat run scripts/upgrade-staker.ts --network sepolia`
+1. Verify:  
+`npx hardhat verify <new staker implementation address> --network sepolia`
 
 #### Upgrading Mainnet (Ethereum)
 
@@ -56,5 +66,5 @@ Run the following commands:
 `npx hardhat verify <new implementation address> --network mainnet`
 1. Manually upgrade the proxy admin to point the proxy to the new implementation. This is done via the Safe app.
 2. Import the implementation:  
-   `IMPLEMENTATION=<new implementation address> npx hardhat run scripts/deploy/import-implementation.ts --network mainnet`
+   `IMPLEMENTATION=<new implementation address> npx hardhat run scripts/import-implementation.ts --network mainnet`
  

@@ -9,10 +9,6 @@ async function main() {
   const chainID = network.config.chainId;
   console.log(`Chain ID: ${chainID}`);
 
-  // Get a deployer address.
-  let deployerWallet = new ethers.Wallet(await network.config.accounts[0]);
-  console.log(`Deployer address: ${deployerWallet.address}`);
-
   // Load the contract proxy and await deployment.
   const contractFactory = await ethers.getContractFactory(contractName);
   const contract = await upgrades.deployProxy(contractFactory);
