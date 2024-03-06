@@ -14,7 +14,7 @@ describe("UPGRADE", () => {
       expect(address).to.be.lengthOf(42);
     });
 
-    it.only("can access all storage variables after an upgrade", async () => {
+    it("can access all storage variables after an upgrade", async () => {
       // Get the mainnet staker contract
       const mainnetStaker = await ethers.getContractAt(
         constants.MAINNET_STAKER_ABI,
