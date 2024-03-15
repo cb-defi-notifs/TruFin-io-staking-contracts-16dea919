@@ -4,6 +4,8 @@ import MaticTokenABI from "../../../../abis/external/MaticToken.json";
 import StakeManagerABI from "../../../../abis/external/StakeManager.json";
 import ValidatorShareABI from "../../../../abis/external/ValidatorShare.json";
 import WhitelistABI from "../../../../abis/whitelist/MasterWhitelist.json";
+import MainnetStakerABI from "../../../../abis/mainnet/TruStakeMATICv2.json";
+import StakerABI from "../../../../abis/matic-staker/TruStakeMATICv2.json";
 
 // --- Chain Config ---
 
@@ -78,6 +80,10 @@ export const STAKE_MANAGER_ABI = StakeManagerABI;
 export const VALIDATOR_SHARE_ABI = ValidatorShareABI;
 
 export const WHITELIST_ABI = WhitelistABI;
+
+export const MAINNET_STAKER_ABI = MainnetStakerABI;
+
+export const STAKER_ABI = StakerABI;
 
 // Other args
 export const EPSILON = BigNumber.from(1e4);

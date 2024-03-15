@@ -5,10 +5,10 @@
 
 
 1. Deploy:  
-`npx hardhat run scripts/deploy/deploy-whitelist.ts --network <goerli or mainnet>`
+`npx hardhat run scripts/deploy/deploy-whitelist.ts --network <goerli, sepolia or mainnet>`
 
 2. Verify:  
-`npx hardhat verify <new whitelist implementation address> --network <goerli or mainnet>`
+`npx hardhat verify <new whitelist implementation address> --network <goerli, sepolia or mainnet>`
 
 Note: If deploying for mainnet, don't forget to change the proxy admin to be controlled by a multisig.
 
@@ -23,6 +23,17 @@ Run the following commands:
 `CONTRACT=<the proxy contract address> npx hardhat run scripts/deploy/upgrade-whitelist.ts --network goerli`
 2. Verify:  
 `npx hardhat verify <new whitelist implementation address> --network goerli`
+
+#### Upgrading Testnet (Sepolia)
+
+To upgrade for testnet, deploy the implementation and update the proxy in one go.
+
+Run the following commands:
+
+1. Deploy:  
+`CONTRACT=<the proxy contract address> npx hardhat run scripts/deploy/upgrade-whitelist.ts --network sepolia`
+2. Verify:  
+`npx hardhat verify <new whitelist implementation address> --network sepolia`
 
 
 #### Upgrading Mainnet (Ethereum)

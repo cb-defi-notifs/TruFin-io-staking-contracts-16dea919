@@ -21,6 +21,13 @@ export default {
       // gasPrice: 40_000_000_000,
       accounts: [process.env.DEPLOYER_PK],
     },
+    sepolia: {
+      url: process.env.SEPOLIA_RPC,
+      chainId: 11155111,
+      // gas: 180_000_000,
+      // gasPrice: 40_000_000_000,
+      accounts: [process.env.DEPLOYER_PK],
+    },
     mumbai: {
       url: process.env.MUMBAI_RPC,
       chainId: 80001,

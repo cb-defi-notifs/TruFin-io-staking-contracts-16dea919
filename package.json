@@ -14,34 +14,35 @@
     "prettify-sol": "lerna run prettify-sol --stream --concurrency 1 --no-bail",
     "coverage-sol": "lerna run coverage-sol --stream --concurrency 1 --no-bail",
     "check-gas": "lerna run check-gas --stream --concurrency 1 --no-bail",
+    "size-contracts": "lerna run size-contracts --stream --concurrency 1 --no-bail",
     "export-abis": "lerna run export-abis --stream --concurrency 1 --no-bail",
-    "slither" : "lerna exec slither ."
+    "slither": "lerna exec slither .",
+    "clean": "lerna run clean --stream --concurrency 1 --no-bail"
   },
   "devDependencies": {
-    "@nomicfoundation/hardhat-network-helpers": "^1.0.8",
+    "@nomicfoundation/hardhat-network-helpers": "^1.0.10",
     "@nomicfoundation/hardhat-toolbox": "^2.0.2",
     "@openzeppelin/hardhat-upgrades": "^1.27.0",
-    "@types/chai": "^4.3.4",
-    "@types/mocha": "^10.0.1",
-    "@types/node": "^18.11.18",
+    "@types/chai": "^4.3.11",
+    "@types/mocha": "^10.0.6",
+    "@types/node": "^20.11.7",
     "cli-color": "^2.0.3",
-    "hardhat": "^2.13.0",
+    "hardhat": "^2.19.4",
     "hardhat-abi-exporter": "^2.10.1",
     "hardhat-change-network": "^0.0.7",
-    "hardhat-contract-sizer": "^2.8.0",
-    "lerna": "^7.1.4",
+    "hardhat-contract-sizer": "^2.10.0",
+    "lerna": "^8.0.2",
     "matic-protocol": "github:maticnetwork/contracts",
-    "prettier": "^2.8.8",
-    "prettier-plugin-solidity": "^1.1.3",
-    "solhint": "^3.4.1"
+    "prettier": "^3.2.4",
+    "prettier-plugin-solidity": "^1.3.1",
+    "solhint": "^4.1.1",
+    "@defi-wonderland/smock": "^2.3.5"
   },
   "dependencies": {
-    "@defi-wonderland/smock": "^2.3.5",
     "@ethersproject/constants": "^5.7.0",
     "@openzeppelin/contracts": "^4.9.0",
     "@openzeppelin/contracts-upgradeable": "^4.9.0",
-    "dotenv": "^16.0.3",
-    "envfile": "^6.18.0",
-    "web3": "^4.1.0"
+    "dotenv": "^16.4.1",
+    "envfile": "^7.1.0"
   }
 }
