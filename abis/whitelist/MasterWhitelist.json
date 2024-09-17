@@ -11,12 +11,32 @@
   },
   {
     "inputs": [],
+    "name": "CannotAddOwner",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "CannotRemoveOwner",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "UserAlreadyAnAgent",
+    "type": "error"
+  },
+  {
+    "inputs": [],
     "name": "UserAlreadyBlacklisted",
     "type": "error"
   },
   {
     "inputs": [],
     "name": "UserAlreadyWhitelisted",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "UserIsNotAnAgent",
     "type": "error"
   },
   {

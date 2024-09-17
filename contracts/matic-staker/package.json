@@ -8,8 +8,10 @@
     "lint-sol": "solhint 'contracts/**/*.sol'",
     "coverage-sol": "hardhat coverage",
     "check-gas": "REPORT_GAS=true hardhat test",
+    "size-contracts": "npx hardhat size-contracts",
     "export-abis": "npx hardhat export-abi",
-    "slither": "slither ."
+    "slither": "slither .",
+    "clean": "npx hardhat clean"
   },
   "author": "",
   "license": "ISC"

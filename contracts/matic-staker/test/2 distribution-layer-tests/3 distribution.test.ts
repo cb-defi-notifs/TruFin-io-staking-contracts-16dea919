@@ -9,7 +9,7 @@ import { EPSILON } from "../helpers/constants";
 
 describe("DISTRIBUTION", () => {
   // Accounts
-  let deployer, treasury, allocatorOne, recipientOne, recipientTwo, depositor, staker, stakeManager, token;
+  let deployer, treasury, allocatorOne, recipientOne, recipientTwo, depositor, staker, whitelist, token;
 
   // Test constants
   const ALLOCATED_AMOUNT = parseEther(10000);
@@ -24,7 +24,7 @@ describe("DISTRIBUTION", () => {
       deployer,
       treasury,
       staker,
-      stakeManager,
+      whitelist,
       token
     } = await loadFixture(deployment));
 
@@ -58,6 +58,11 @@ describe("DISTRIBUTION", () => {
           expect(await staker.balanceOf(recipientOne.address)).to.equal(0);
           expect(await staker.balanceOf(recipientTwo.address)).to.equal(0);
         });
+
+        it("Reverts if there are no recipients to distribute to", async () => {
+          // attempt to distribute to all recipients revert if there are no recipients.
+          await expect(staker.connect(depositor).distributeAll(false)).to.be.revertedWithCustomError(staker, "NoRecipientsFound");
+        });
       });
 
       describe("Distribute rewards", async () => {
@@ -89,6 +94,14 @@ describe("DISTRIBUTION", () => {
 
           // Check total allocation share price
           expect(sharePriceNum.div(sharePriceDenom)).to.equal(globalSharePriceNumerator.div(globalSharePriceDenominator));
+        });
+
+        it("DistributeAll reverts if user is not whitelisted", async () => {
+          // blacklist allocator
+          whitelist.isUserWhitelisted.returns(false);
+
+          // attempt to distribute recipient rewards should fail
+          await expect(staker.connect(allocatorOne).distributeAll(false)).to.be.revertedWithCustomError(staker, "UserNotWhitelisted");
         });
       });
     });
@@ -374,7 +387,7 @@ describe("DISTRIBUTION", () => {
       deployer,
       treasury,
       staker,
-      stakeManager
+      whitelist
     } = await loadFixture(deployment));
 
     // Perform same deposits and allocations made previously
@@ -414,6 +427,14 @@ describe("DISTRIBUTION", () => {
         ).to.be.revertedWith("SafeERC20: low-level call failed");
       });
 
+      it("Reverts if user is not whitelisted", async () => {
+        // blacklist allocator
+        whitelist.isUserWhitelisted.returns(false);
+
+        // attempt to distribute recipient rewards should fail
+        await expect(staker.connect(allocatorOne).distributeRewards(recipientOne.address, false)).to.be.revertedWithCustomError(staker, "UserNotWhitelisted");
+      });
+
       it("No TruMATIC is transferred to recipients when distributing MATIC", async () => {
         await submitCheckpoint(0);
         await staker.connect(allocatorOne).distributeRewards(recipientOne.address, true);
@@ -434,7 +455,7 @@ describe("DISTRIBUTION", () => {
         let truMaticAmount = await staker.balanceOf(recipientTwo.address);
 
         // when distributing to user1 in MATIC, they should receive the equivalent amount as User2
-        let maticAmount =  await staker.previewRedeem(truMaticAmount);
+        let maticAmount =  await staker.convertToAssets(truMaticAmount);
         await expect(
           staker.connect(allocatorOne).distributeRewards(recipientOne.address, true)
         ).to.changeTokenBalance(token, recipientOne, maticAmount);
@@ -487,7 +508,7 @@ describe("DISTRIBUTION", () => {
         await staker.connect(allocatorOne).distributeAll(true);
 
         // expect recipients balance to have increased be the equivalent MATIC amount
-        let maticAmount =  await staker.previewRedeem(truMaticAmount);
+        let maticAmount =  await staker.convertToAssets(truMaticAmount);
         expect(await token.balanceOf(recipientOne.address)).to.equal(preBalanceOne.add(maticAmount));
         expect(await token.balanceOf(recipientTwo.address)).to.equal(preBalanceTwo.add(maticAmount));
 
@@ -496,4 +517,8 @@ describe("DISTRIBUTION", () => {
       });
     });
   });
+
+  afterEach(() => {
+    whitelist.isUserWhitelisted.returns(true);
+  })
 });

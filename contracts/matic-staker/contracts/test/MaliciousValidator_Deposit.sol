@@ -29,7 +29,7 @@ contract MaliciousValidator_Deposit is IValidatorShare {
 
     // the staker's deposit function pefroms an external call to the validator contract
     //  that allow to re-enter any nonReentrant functions in the same transaction
-    function buyVoucher(uint256 _amount, uint256 _minSharesToMint) external returns (uint256 amountToDeposit) {
+    function buyVoucher(uint256 _amount, uint256 /*_minSharesToMint*/) external returns (uint256 amountToDeposit) {
         maticToken.approve(address(staker), halfDeposit);
         staker.depositToSpecificValidator(halfDeposit, address(this));
 

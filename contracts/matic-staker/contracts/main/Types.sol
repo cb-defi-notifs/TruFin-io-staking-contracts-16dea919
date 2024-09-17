@@ -28,10 +28,12 @@ struct Allocation {
 /// @param state The state of the validator.
 /// @param stakedAmount The amount of Matic staked on the validator. This is the maximum that can be withdrawn from this validator.
 /// @param validatorAddress The address of the validator.
+/// @param isPrivate Indicates whether access to the validator is limited to specific users.
 struct Validator {
     ValidatorState state;
     uint256 stakedAmount;
     address validatorAddress;
+    bool isPrivate;
 }
 
 /// @notice Enum for the possible validator states.
